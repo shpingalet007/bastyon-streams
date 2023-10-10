@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Streaming test</title>
+	<script src="../dist/bastyon-streams.min.js"></script>
+</head>
+<body>
+  <button id="camera">Camera</button>
+  <button id="screen">Screen</button>
+  <button id="idle">Idle</button><hr/>
+  <input id="rtmp-link" type="text">
+  <input id="rtmp-key" type="text"><hr/>
+  <button id="start">START STREAMING</button><hr/>
+
+  <!-- Here would be HTML5 Video -->
+</body>
+<script>
+  document.querySelector('#start').addEventListener('click', () => {
+		const rtmpLink = document.querySelector('#rtmp-link').value;
+		const rtmpKey = document.querySelector('#rtmp-key').value;
+
+		const link = `${rtmpLink}/${rtmpKey}`;
+
+		let bastyonStream = new BastyonStream({
+			width: 858,
+			height: 480,
+			rtmp: link,
+		});
+
+		bastyonStream.constructPlayer(document.body);
+
+		document.querySelector('#camera').addEventListener('click', () => {
+			bastyonStream.toggleCamera();
+		});
+
+		document.querySelector('#screen').addEventListener('click', () => {
+			bastyonStream.toggleDisplay();
+		});
+
+		document.querySelector('#idle').addEventListener('click', () => {
+			bastyonStream.toggleScreensaver();
+		});
+  });
+</script>
+</html>
