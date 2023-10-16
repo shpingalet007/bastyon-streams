@@ -1,13 +1,14 @@
 const path = require("path");
+const webpack = require("webpack");
 
 const config = {
-  entry: "./src/main.js",
+  entry: "./src/main2.js",
   output: {
     filename: 'bastyon-streams.min.js',
     path: path.resolve(__dirname, "dist"),
     library: {
       type: "umd",
-      name: "BastyonStream",
+      name: "BastyonStreams",
       export: "default",
     },
   },

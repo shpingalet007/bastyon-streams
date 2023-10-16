@@ -1,280 +1,550 @@
-class AggregatedMediaStream {
-	#video;
+import {
+	Application as PixiApplication,
+	BaseTexture as PixiBaseTexture,
+	Texture as PixiTexture,
+	Sprite as PixiSprite,
+	VideoResource as PixiVideoResource,
+	RoundedRectangle as PixiRoundedRectangle,
+	Graphics as PixiGraphics,
+	Container as PixiContainer,
+	Text as PixiText,
+} from 'pixi.js';
+import { BrowserToRtmpClient } from "@api.video/browser-to-rtmp-client";
 
-	scaleFactor = { width: 0, height: 0 };
-	crop = { x: 0, y: 0, width: 0, height: 0 };
-	position = { x: 0, y: 0 };
-	size = { width: 0, height: 0 };
+class BaseMediaStreamClass {
+	self = BaseMediaStreamClass;
 
-	enabled = true;
+	static MediaStreamResource = class extends PixiVideoResource {
+		constructor(source, options) {
+			options = options || {};
 
-	constructor(holder, id, stream) {
-		this.holder = holder;
-		this.id = id;
-		this.stream = stream;
+			const videoElement = document.createElement('video');
 
-		this.#adaptToStream(stream);
-		this.#createVideo();
-	}
+			videoElement.srcObject = source;
+			//videoElement.play();
 
-	#createVideo() {
-		this.#video = document.createElement('video');
-
-		this.#video.autoplay = true;
-		this.#video.playsInline = true;
-		this.#video.controls = true;
-
-		this.#video.srcObject = this.stream;
-	}
-
-	setPosition(x, y) {
-		this.position = {
-			x,
-			y
-		};
-	}
-
-	setSize(width, height) {
-		this.size = {
-			width,
-			height
-		};
-	}
-
-	setCrop(x, y, width, height) {
-		this.crop = {
-			x,
-			y,
-			width,
-			height
-		};
-	}
-
-	setPreprocess(callback) {
-		this.preprocessor = callback;
-	}
-
-	setPostprocess(callback) {
-		this.postprocessor = callback;
-	}
-
-	draw(context) {
-		if (!this.enabled) {
-			return;
+			super(videoElement, {
+				autoPlay: true,
+				autoLoad: true,
+				...options.updateFPS,
+			});
 		}
 
-		this.preprocessor?.(this.holder.canvas, context);
-
-		const streamSize = this.getStreamSize();
-
-		const cropWidth = this.crop.width || streamSize[0];
-		const cropHeight = this.crop.height || streamSize[1];
-
-		const params = [];
-		params.push(this.crop.x, this.crop.y, cropWidth, cropHeight);
-		params.push(this.position.x, this.position.y);
-		params.push(this.size.width, this.size.height);
-
-		context.drawImage(this.#video, ...params);
-
-		this.postprocessor?.(this.holder.canvas, context);
+		destroy() {
+			super.destroy();
+		}
 	}
 
-	#adaptToStream(stream) {
-		const videoSettings = stream.getVideoTracks()[0].getSettings();
-		const streamWidth = videoSettings.width;
-		const streamHeight = videoSettings.height;
-
-		this.crop.width = this.size.width = streamWidth;
-		this.crop.height = this.size.height = streamHeight;
-
-		const widthScaleDownFactor = streamWidth / this.holder.width;
-		const heightScaleDownFactor = streamHeight / this.holder.height;
-		const widthScaleUpFactor = this.holder.width / streamWidth;
-		const heightScaleUpFactor = this.holder.height / streamHeight;
-
-		this.scaleFactor.width = Math.min(widthScaleDownFactor, widthScaleUpFactor);
-		this.scaleFactor.height = Math.min(heightScaleDownFactor, heightScaleUpFactor);
-	}
-
-	getStreamSize() {
-		const videoSettings = this.stream.getVideoTracks()[0].getSettings();
-		const streamWidth = videoSettings.width;
-		const streamHeight = videoSettings.height;
-
-		return [streamWidth, streamHeight];
-	}
-}
-
-class AggregatingMediaStream {
 	/**
-	 * Aggregated streams collection
-	 * @type {AggregatedMediaStream[]}
+	 *
+	 * @param {BastyonStreams} parent
 	 */
-	#streams = [];
-
-	canvas;
-	context;
-
-	constructor(width, height, fps) {
-		this.width = width;
-		this.height = height;
-
-		const eachMs = 1000 / fps;
-
-		this.#createCanvas();
-
-		setInterval(() => {
-			this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-			for (let i = 0; i < this.#streams.length; i++) {
-				this.#streams[i].draw(this.context);
-			}
-		}, eachMs);
+	constructor(parent) {
+		this.parent = parent;
 	}
 
-	#createCanvas() {
-		this.canvas = document.createElement('canvas');
-		this.canvas.width = this.width;
-		this.canvas.height = this.height;
-
-		this.context = this.canvas.getContext('2d');
-	}
-
-	deployCanvas(elem) {
-		elem.append(this.canvas);
-	}
-
-	addStream(stream, priority) {
-		const streamId = priority || this.#streams.length;
-		const aggrStream = new AggregatedMediaStream(this, streamId, stream);
-
-		if (priority) {
-			this.#streams[priority] = aggrStream;
-		} else {
-			this.#streams.push(aggrStream);
-		}
-
-		return aggrStream;
-	}
-
-	removeStream(stream) {
-		this.#streams.splice(stream.id, 1);
-	}
-
-	// TODO: Move from this class the Canvas and related funcs
 	/**
-	 * Get canvas holder sizes
-	 * @return {[number, number]}
+	 * @protected
+	 * @param {MediaStream} stream
 	 */
-	getCanvasSize() {
-		return [this.canvas.width, this.canvas.height];
+	createSpriteFromMediaStream(stream) {
+		const resource = new this.self.MediaStreamResource(stream, {});
+		const baseTexture = new PixiBaseTexture(resource);
+		const texture = new PixiTexture(baseTexture);
+
+		return new PixiSprite(texture);
+	}
+
+	/**
+	 * @protected
+	 */
+	getMediaStreamSize(stream) {
+		const settings = stream.getVideoTracks()[0].getSettings();
+		const { width, height } = settings;
+
+		return { width, height };
+	}
+
+	/**
+	 * @protected
+	 */
+	stopMediaStream(stream) {
+		stream.getTracks().forEach((track) => {
+			track.stop();
+		});
+	}
+
+	/**
+	 * Destroys class instance
+	 */
+	destroy() {
+		throw Error('No destroy method is implemented');
 	}
 }
 
-/**
- * SCREEN DEMO + VIDEO SQUARE
- */
-class ScreenDemonstrationStream extends AggregatingMediaStream {
-	screenStream;
-	cameraStream;
+class CameraEnabledDemonstration extends BaseMediaStreamClass {
+	cameraSprite;
 
-	constructor(...args) {
-		super(...args);
+	/**
+	 * Provide MediaStream for camera square
+	 * @param {MediaStream} mediaStream
+	 */
+	addCameraMedia(mediaStream) {
+		this.cameraMedia = mediaStream;
 	}
 
-	addScreenStream(stream) {
-		const scrStream = this.addStream(stream, 1);
+	offCamera = () => this.cameraSprite.visible = false;
+	onCamera = () => this.cameraSprite.visible = true;
+	isCameraEnabled = () => this.cameraSprite.visible;
+}
 
-		function dynamicRecalculation() {
-			const canvasSize = scrStream.holder.getCanvasSize();
-			const streamSize = scrStream.getStreamSize();
+class ScreenDemonstration extends CameraEnabledDemonstration {
+	#screenMedia;
+	#screenSprite;
 
-			// Center the image in canvas
-			const posX = (canvasSize[0] - streamSize[0]) / 2;
-			const posY = (canvasSize[1] - streamSize[1]) / 2;
+	/**
+	 * Provide MediaStream for screen demonstration
+	 * @param {MediaStream} mediaStream
+	 */
+	addScreenMedia(mediaStream) {
+		this.#screenMedia = mediaStream;
+	}
 
-			scrStream.setPosition(posX, posY);
-			scrStream.setSize(...streamSize);
-			scrStream.setCrop(0, 0, streamSize[0], streamSize[1]);
+	/**
+	 * Prepare screen demonstration sprite
+	 * @param {PixiApplication} app
+	 * @param {MediaStream} mediaStream
+	 */
+	#setupScreenSprite(app, mediaStream) {
+		const screenSprite = super.createSpriteFromMediaStream(mediaStream);
+
+		// Center texture
+		screenSprite.anchor.set(0.5);
+		screenSprite.x = app.view.width / 2;
+		screenSprite.y = app.view.height / 2;
+
+		app.ticker.add(() => {
+			const streamSize = super.getMediaStreamSize(mediaStream);
+
+			const cameraWidth = streamSize.width;
+			const cameraHeight = streamSize.height;
+
+			const cameraScaleW = app.view.width / cameraWidth;
+			const cameraScaleH = app.view.height / cameraHeight;
+
+			const cameraScaleFactor = Math.min(cameraScaleW, cameraScaleH);
+
+			if (cameraScaleFactor > 1) {
+				screenSprite.width = cameraWidth;
+				screenSprite.height = cameraHeight;
+				return;
+			}
+
+			screenSprite.width = cameraWidth * cameraScaleFactor;
+			screenSprite.height = cameraHeight * cameraScaleFactor;
+		});
+
+		return screenSprite;
+	}
+
+	/**
+   * Prepare camera square sprite
+	 * @param {PixiApplication} app
+	 * @param {MediaStream} mediaStream
+	 */
+	#setupCameraSprite(app, mediaStream) {
+		const cameraSprite = super.createSpriteFromMediaStream(mediaStream);
+		const streamSize = super.getMediaStreamSize(mediaStream);
+
+		// Position to the right side
+		cameraSprite.anchor.set(1);
+		cameraSprite.x = app.view.width - this.parent.self.Padding;
+		cameraSprite.y = app.view.height - this.parent.self.Padding;
+
+		const regionWidth = app.view.width - this.parent.self.Padding * 2;
+		cameraSprite.width = regionWidth / 4;
+		const scaleFactor = cameraSprite.width / streamSize.width;
+		cameraSprite.height = streamSize.height * scaleFactor;
+
+		return cameraSprite;
+	}
+
+	/**
+	 * Attach to Pixi application
+	 * @param {PixiApplication} app
+	 */
+	attachToApp(app) {
+		this.#screenSprite = this.#setupScreenSprite(app, this.#screenMedia);
+		this.cameraSprite = this.#setupCameraSprite(app, this.cameraMedia);
+
+		app.stage.addChild(this.#screenSprite);
+		app.stage.addChild(this.cameraSprite);
+
+		this.parent.setupDraggable(this.cameraSprite);
+		this.parent.setupScalable(this.cameraSprite);
+	}
+
+	destroy(app) {
+		this.#screenSprite.texture.baseTexture.resource.destroy();
+		this.cameraSprite.texture.baseTexture.resource.destroy();
+
+		super.stopMediaStream(this.cameraMedia);
+		super.stopMediaStream(this.#screenMedia);
+
+		app.stage.removeChild(this.#screenSprite);
+		app.stage.removeChild(this.cameraSprite);
+
+		this.parent.removeAllEvents(this.cameraSprite);
+
+		this.#screenSprite = null;
+		this.cameraSprite = null;
+		this.#screenMedia = null;
+		this.cameraMedia = null;
+	}
+}
+
+class CameraDemonstration extends CameraEnabledDemonstration {
+	#fallbackContainer;
+
+	constructor(parent, options) {
+		super(parent);
+
+		this.options = options;
+	}
+
+	/**
+	 * Attach to Pixi application
+	 * @param {PixiApplication} app
+	 */
+	attachToApp(app) {
+		//this.#fallbackContainer = this.#setupFallbackSprite(app, this.options.image);
+		this.cameraSprite = this.#setupSprite(app, this.cameraMedia);
+
+		//app.stage.addChild(this.#fallbackContainer);
+		app.stage.addChild(this.cameraSprite);
+	}
+
+	/**
+	 * Prepare camera demonstration sprite
+	 * @param {PixiApplication} app
+	 * @param {MediaStream} mediaStream
+	 */
+	#setupSprite(app, mediaStream) {
+		const cameraSprite = super.createSpriteFromMediaStream(mediaStream);
+
+		const streamSize = super.getMediaStreamSize(mediaStream);
+
+		cameraSprite.anchor.set(0);
+		cameraSprite.x = 0;
+		cameraSprite.y = 0;
+
+		const scaleX = app.view.width / streamSize.width;
+		const scaleY = app.view.height / streamSize.height;
+
+		const minScale = Math.min(scaleX, scaleY);
+
+		let fittedWidth = streamSize.width * minScale;
+		let fittedHeight = streamSize.height * minScale;
+
+		console.log(fittedWidth, fittedHeight);
+
+		cameraSprite.width = fittedWidth;
+		cameraSprite.height = fittedHeight;
+
+		return cameraSprite;
+	}
+
+	#setupFallbackSprite(app, image) {
+		const imageTexture = PixiTexture.from(image);
+
+		const container = new PixiContainer();
+
+		const circleMask = new PixiGraphics();
+		circleMask.beginFill(0xffffff);
+		const radius = imageTexture.width / 2;
+		circleMask.drawCircle(radius, radius, radius);
+		circleMask.pivot.set(circleMask.width / 2);
+		circleMask.endFill();
+
+		const imageSprite = new PixiSprite(imageTexture);
+		imageSprite.anchor.set(0.5);
+		imageSprite.mask = circleMask;
+
+		const basicText = new PixiText('AAAA');
+		basicText.style.fill = 0xffffff;
+		basicText.style.align = 'center';
+		basicText.style.fontSize = 35;
+
+		basicText.position.set(0, 200);
+		circleMask.position.set(0, 0);
+
+		circleMask.x = 0;
+		circleMask.y = 0;
+		imageSprite.x = 0;
+		imageSprite.y = 0;
+
+		console.log(container.width / 2);
+
+		container.addChild(imageSprite);
+		//container.addChild(basicText);
+		container.addChild(circleMask);
+
+		console.log(app.view.width / 2, app.view.height / 2);
+
+		container.pivot.set(app.view.width / 2 - container.width / 2, container.height / 2 - container.height / 2);
+		container.position.set(app.view.width / 2, app.view.height / 2);
+
+		console.log(container);
+
+		return container;
+	}
+
+	destroy(app) {
+		this.cameraSprite.texture.baseTexture.resource.destroy();
+
+		super.stopMediaStream(this.cameraMedia);
+
+		app.stage.removeChild(this.cameraSprite);
+		this.parent.removeAllEvents(this.cameraSprite);
+
+		this.cameraSprite = null;
+		this.cameraMedia = null;
+
+		// TODO: Fallback container must be removed here too
+	}
+}
+
+class BastyonStreams {
+	self = BastyonStreams;
+
+	static BackColor = '#000';
+	static Wrapper = '#pixi-wrapper';
+	static Padding = 20;
+
+	/**
+	 * Pixi app wrapping element
+	 * @type {HTMLElement}
+	 */
+	#wrapper;
+
+	/**
+	 * Pixi app instance
+	 * @type {PixiApplication}
+	 */
+	#app;
+
+	/**
+	 * RTMP streaming class instance
+	 * @type {BrowserToRtmpClient}
+	 */
+	#streamer;
+
+	/**
+	 * @type {BaseMediaStreamClass}
+	 */
+	#current;
+
+	#dragTarget;
+	#dragCoords;
+
+	constructor(options = {}) {
+		this.#wrapper = document.querySelector(options.wrapper || BastyonStreams.Wrapper);
+
+		this.#app = new PixiApplication({
+			background: options.background || BastyonStreams.BackColor,
+			resizeTo: this.#wrapper,
+			eventMode: 'static',
+		});
+
+		this.#app.stage.eventMode = 'static';
+		this.#app.stage.hitArea = this.#app.screen;
+
+		this.#setupEvents(this.#app);
+	}
+
+	mountApp() {
+		this.#wrapper.appendChild(this.#app.view);
+	}
+
+	async gotoScreen() {
+		const screenMode = new ScreenDemonstration(this);
+
+		screenMode.addScreenMedia(await navigator.mediaDevices.getDisplayMedia());
+		screenMode.addCameraMedia(await navigator.mediaDevices.getUserMedia({ video: true }));
+
+		screenMode.attachToApp(this.#app);
+
+		this.#current?.destroy(this.#app);
+		this.#current = screenMode;
+
+		return screenMode;
+	}
+
+	async gotoCamera() {
+		const cameraMode = new CameraDemonstration(this, { image: 'https://i.imgur.com/LzcDKhYh.jpg'});
+
+		cameraMode.addCameraMedia(await navigator.mediaDevices.getUserMedia({ video: true }));
+
+		cameraMode.attachToApp(this.#app);
+
+		this.#current?.destroy(this.#app);
+		this.#current = cameraMode;
+
+		return cameraMode;
+	}
+
+	#spriteBoxedMovement(sprite, x, y, box = { x1: 0, x2: 0, y1: 0, y2: 0}, relative, onlyCheck) {
+		const anchors = sprite.anchor;
+
+		const x1 = box.x1 + sprite.width * anchors.x;
+		const x2 = box.x2 - sprite.width * (1 - anchors.x);
+		const y1 = box.y1 + sprite.height * anchors.y;
+		const y2 = box.y2 - sprite.height * (1 - anchors.y);
+
+		const disX = relative.x * sprite.scale.x;
+		const disY = relative.y * sprite.scale.y;
+
+		const lessX1 = (x - disX < x1);
+		const moreX2 = (x - disX > x2);
+		const lessY1 = (y - disY < y1);
+		const moreY2 = (y - disY > y2);
+
+		if (!lessX1 && !moreX2) {
+			sprite.x = Math.round(x - disX);
 		}
 
-		scrStream.setPreprocess((canvas, context) => {
-			dynamicRecalculation();
+		if (!lessY1 && !moreY2) {
+			sprite.y = Math.round(y - disY);
+		}
 
-			context.globalCompositeOperation = 'destination-over';
-		});
+		if (lessX1 || moreX2 || lessY1 || moreY2) {
+			if (!onlyCheck) {
+				const posX = window.event.clientX;
+				const posY = window.event.clientY;
 
-		scrStream.setPostprocess((canvas, context) => {
-			context.beginPath();
-			context.fillStyle = '#000';
-			context.fillRect(0, 0, canvas.width, canvas.height);
-		});
+				this.#dragCoords = sprite.toLocal({ x: posX, y: posY }, null);
+			}
 
-		this.screenStream = scrStream;
-		return scrStream;
+			return false;
+		}
+
+		return true;
 	}
 
-	addVideoStream(stream) {
-		const camStream = this.addStream(stream, 0);
+	setupDraggable(sprite) {
+		const events = this.#getEvents();
 
-		function getRegionParams() {
-			const canvasSize = camStream.holder.getCanvasSize();
+		sprite.on('pointerdown', events.onDragStart, sprite);
+	}
 
-			const widthPercent = 0.25;
-			const positionPercent = 0.75;
-			const padding = 50;
+	setupScalable(sprite) {
+		const events = this.#getEvents();
 
-			return {
-				x: Math.floor((canvasSize[0] - padding * 2) * positionPercent) - 0.5,
-				y: Math.floor((canvasSize[1] - padding * 2) * positionPercent) - 0.5,
-				width: Math.floor(canvasSize[0] * widthPercent),
-				height: Math.floor(canvasSize[1] * widthPercent),
+		sprite.on('wheel', events.constructOnWheel(this.#app), sprite);
+	}
+
+	removeAllEvents(sprite) {
+		const events = this.#getEvents();
+
+		sprite.off('pointerdown', events.onDragStart, sprite);
+		sprite.off('wheel', events.constructOnWheel(this.#app), sprite);
+	}
+
+	#getEvents() {
+		const self = this;
+
+		const toggleBoxMovement = (isCheck = false) => {
+			console.log(event);
+			return self.#spriteBoxedMovement(self.#dragTarget, event.x, event.y, {
+				x1: BastyonStreams.Padding, x2: self.#app.view.width - BastyonStreams.Padding,
+				y1: BastyonStreams.Padding, y2: self.#app.view.height - BastyonStreams.Padding,
+			}, self.#dragCoords, isCheck);
+		}
+
+		function onDragMove(event) {
+			if (self.#dragTarget) {
+				toggleBoxMovement();
 			}
 		}
 
-		function dynamicRecalculation() {
-			const region = getRegionParams();
-			const streamSize = camStream.getStreamSize();
+		function onDragStart(event) {
+			self.#dragTarget = this;
+			self.#dragCoords = self.#dragTarget.toLocal(event, null);
 
-			camStream.setPosition(region.x, region.y);
-			camStream.setSize(region.width, region.height);
-			camStream.setCrop(0, 0, streamSize[0], streamSize[1]);
+			if (toggleBoxMovement(true)) {
+				self.#dragTarget.alpha = 0.9;
+				self.#app.stage.on('pointermove', onDragMove);
+			}
 		}
 
-		camStream.setPreprocess((canvas, context) => {
-			dynamicRecalculation();
+		function onDragEnd(event) {
+			if (self.#dragTarget) {
+				self.#app.stage.off('pointermove', onDragMove);
+				self.#dragTarget.alpha = 1;
+				self.#dragTarget = null;
+			}
+		}
 
-			context.globalCompositeOperation = 'source-over';
+		function onWheel(event, app) {
+			const paddedZone = app.view.width - self.self.Padding * 2;
+			const w8 = paddedZone / 8;
+			const w2 = paddedZone / 2;
+			const isSmallEnough = this.width <= w8;
+			const isBigEnough = this.width >= w2;
+
+			if (event.deltaY > 0 && !isBigEnough) {
+				const newScale = this.scale.x + 0.01;
+				this.scale.set(newScale);
+				return;
+			}
+
+			if (event.deltaY < 0 && !isSmallEnough) {
+				const newScale = this.scale.x - 0.01;
+				this.scale.set(newScale);
+			}
+		}
+
+		function constructOnWheel(app) {
+			return function(e) {
+				onWheel.bind(this)(e, app);
+			}
+		}
+
+		return {
+			onDragMove,
+			onDragStart,
+			onDragEnd,
+			constructOnWheel,
+		};
+	}
+
+	#setupEvents(app) {
+		const events = this.#getEvents();
+
+		app.stage.on('pointerup', events.onDragEnd);
+		app.stage.on('pointerupoutside', events.onDragEnd);
+	}
+
+	async applyAudioTrack(stream) {
+		const userMedia = await navigator.mediaDevices.getUserMedia({ audio: true });
+		const audioTrack = userMedia.getAudioTracks()[0];
+		audioTrack.enabled = false;
+
+		stream.addTrack(audioTrack);
+	}
+
+	startStreaming(rtmp) {
+		const stream = this.#app.view.captureStream(30);
+		this.applyAudioTrack(stream);
+
+		this.#streamer = new BrowserToRtmpClient(stream, {
+			host: 'localhost',
+			port: 1234,
+			rtmp: rtmp,
 		});
 
-		camStream.setPostprocess((canvas, context) => {
-			const region = getRegionParams();
-
-			context.beginPath();
-			context.strokeStyle = '#000';
-			context.lineWidth = 7;
-			context.strokeRect(region.x - 0.5, region.y - 0.5, region.width, region.height);
-
-			context.beginPath();
-			context.strokeStyle = '#fff';
-			context.lineWidth = 4;
-			context.strokeRect(region.x - 0.5, region.y - 0.5, region.width, region.height);
-		});
-
-		this.cameraStream = camStream;
-		return camStream;
-	}
-
-	offCamera() {
-		this.cameraStream.enabled = false;
-	}
-
-	onCamera() {
-		this.cameraStream.enabled = true;
-	}
-
-	isCameraEnabled() {
-		return this.cameraStream.enabled;
+		this.#streamer.start();
 	}
 }
+
+export default BastyonStreams;
