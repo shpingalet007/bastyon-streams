@@ -4,7 +4,6 @@ import {
 	Texture as PixiTexture,
 	Sprite as PixiSprite,
 	VideoResource as PixiVideoResource,
-	RoundedRectangle as PixiRoundedRectangle,
 	Graphics as PixiGraphics,
 	Container as PixiContainer,
 	Text as PixiText,
@@ -461,7 +460,7 @@ class BastyonStreams {
 			}, self.#dragCoords, isCheck);
 		}
 
-		function onDragMove(event) {
+		function onDragMove(/* event */) {
 			if (self.#dragTarget) {
 				toggleBoxMovement();
 			}
@@ -477,7 +476,7 @@ class BastyonStreams {
 			}
 		}
 
-		function onDragEnd(event) {
+		function onDragEnd(/* event */) {
 			if (self.#dragTarget) {
 				self.#app.stage.off('pointermove', onDragMove);
 				self.#dragTarget.alpha = 1;
