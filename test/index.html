@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>PIXI</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      #pixi-wrapper {
+        width: calc(1920px / 2);
+        height: calc(1080px / 2);
+      }
+    </style>
+  </head>
+  <body>
+    <input id="rtmp-link" type="text" placeholder="RTMP link" /><button
+      id="start-stream"
+    >
+      STREAM!
+    </button>
+    <hr />
+    <button id="switch-camera">Camera mode</button>
+    <button id="switch-screen">Screen mode</button>
+    <button id="toggle-camera">Toggle camera</button>
+    <div id="pixi-wrapper"></div>
+  </body>
+  <script src="../dist/bastyon-streams.min.js"></script>
+  <script>
+    async function createApp() {
+      const streams = new BastyonStreams();
+      streams.mountApp();
+
+      let streamDemo = null;
+
+      document.querySelector("#toggle-camera").addEventListener("click", () => {
+        if (streamDemo.isCameraEnabled()) {
+          streamDemo.offCamera();
+          return;
+        }
+
+        streamDemo.onCamera();
+      });
+
+      document
+        .querySelector("#switch-camera")
+        .addEventListener("click", async () => {
+          streamDemo = await streams.gotoCamera({
+            avatar: "https://i.imgur.com/LzcDKhYh.jpg",
+          });
+        });
+
+      document
+        .querySelector("#switch-screen")
+        .addEventListener("click", async () => {
+          streamDemo = await streams.gotoScreen();
+        });
+
+      document
+        .querySelector("#start-stream")
+        .addEventListener("click", async () => {
+          const rtmpLink = document.querySelector("#rtmp-link").value;
+          streams.startStreaming(rtmpLink);
+        });
+    }
+
+    createApp();
+  </script>
+</html>
