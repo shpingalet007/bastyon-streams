@@ -1,46 +1,59 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<title>Streaming test</title>
-	<script src="../dist/bastyon-streams.min.js"></script>
+  <meta charset="UTF-8">
+  <title>PIXI</title>
+  <style>
+    html, body {
+        margin: 0;
+        height: 100%;
+    }
+    #pixi-wrapper {
+        width: calc(1920px / 2);
+        height: calc(1080px / 2);
+    }
+  </style>
 </head>
 <body>
-  <button id="camera">Camera</button>
-  <button id="screen">Screen</button>
-  <button id="idle">Idle</button><hr/>
-  <input id="rtmp-link" type="text">
-  <input id="rtmp-key" type="text"><hr/>
-  <button id="start">START STREAMING</button><hr/>
-
-  <!-- Here would be HTML5 Video -->
+  <input id="rtmp-link" type="text" placeholder="RTMP link" /><button id="start-stream">STREAM!</button><hr/>
+  <button id="switch-camera">Camera mode</button>
+  <button id="switch-screen">Screen mode</button>
+  <button id="toggle-camera">Toggle camera</button>
+  <div id="pixi-wrapper"></div>
 </body>
+<script src="../dist/bastyon-streams.min.js"></script>
 <script>
-  document.querySelector('#start').addEventListener('click', () => {
-		const rtmpLink = document.querySelector('#rtmp-link').value;
-		const rtmpKey = document.querySelector('#rtmp-key').value;
+  async function createApp() {
+		const streams = new BastyonStreams();
+		streams.mountApp();
 
-		const link = `${rtmpLink}/${rtmpKey}`;
+		let streamDemo = null;
 
-		let bastyonStream = new BastyonStream({
-			width: 858,
-			height: 480,
-			rtmp: link,
+		document.querySelector('#toggle-camera').addEventListener('click', () => {
+			if (streamDemo.isCameraEnabled()) {
+				streamDemo.offCamera();
+				return;
+			}
+
+			streamDemo.onCamera();
 		});
 
-		bastyonStream.constructPlayer(document.body);
-
-		document.querySelector('#camera').addEventListener('click', () => {
-			bastyonStream.toggleCamera();
+		document.querySelector('#switch-camera').addEventListener('click', async () => {
+			streamDemo = await streams.gotoCamera({
+				avatar: 'https://i.imgur.com/LzcDKhYh.jpg',
+			});
 		});
 
-		document.querySelector('#screen').addEventListener('click', () => {
-			bastyonStream.toggleDisplay();
+		document.querySelector('#switch-screen').addEventListener('click', async () => {
+			streamDemo = await streams.gotoScreen();
 		});
 
-		document.querySelector('#idle').addEventListener('click', () => {
-			bastyonStream.toggleScreensaver();
+		document.querySelector('#start-stream').addEventListener('click', async () => {
+			const rtmpLink = document.querySelector('#rtmp-link').value;
+			streams.startStreaming(rtmpLink);
 		});
-  });
+  }
+
+	createApp();
 </script>
 </html>

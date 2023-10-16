@@ -2,7 +2,7 @@ const path = require("path");
 const webpack = require("webpack");
 
 const config = {
-  entry: "./src/main2.js",
+  entry: "./src/main.js",
   output: {
     filename: 'bastyon-streams.min.js',
     path: path.resolve(__dirname, "dist"),
