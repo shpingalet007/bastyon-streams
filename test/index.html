@@ -48,8 +48,9 @@
         .querySelector("#switch-camera")
         .addEventListener("click", async () => {
           streamDemo = await streams.gotoCamera({
-            avatar: "https://i.imgur.com/LzcDKhYh.jpg",
-          });
+						image: "../static/avatar.jpg",
+						nickname: 'Shpingalet007',
+					});
         });
 
       document

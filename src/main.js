@@ -216,10 +216,10 @@ class CameraDemonstration extends CameraEnabledDemonstration {
    * @param {PixiApplication} app
    */
   attachToApp(app) {
-    //this.#fallbackContainer = this.#setupFallbackSprite(app, this.options.image);
+    this.#fallbackContainer = this.#setupFallbackSprite(app, this.options.image);
     this.cameraSprite = this.#setupSprite(app, this.cameraMedia);
 
-    //app.stage.addChild(this.#fallbackContainer);
+    app.stage.addChild(this.#fallbackContainer);
     app.stage.addChild(this.cameraSprite);
   }
 
@@ -254,49 +254,52 @@ class CameraDemonstration extends CameraEnabledDemonstration {
   }
 
   #setupFallbackSprite(app, image) {
-    const imageTexture = PixiTexture.from(image);
+    app.renderer.background.color = 0x001c29;
 
     const container = new PixiContainer();
 
-    const circleMask = new PixiGraphics();
-    circleMask.beginFill(0xffffff);
-    const radius = imageTexture.width / 2;
-    circleMask.drawCircle(radius, radius, radius);
-    circleMask.pivot.set(circleMask.width / 2);
-    circleMask.endFill();
+    const audioVis = new AudioVisualizer();
 
-    const imageSprite = new PixiSprite(imageTexture);
+    const avatarSize = this.parent.self.FallbackAvatarSize;
+
+    const imageSprite = PixiSprite.from(image);
     imageSprite.anchor.set(0.5);
-    imageSprite.mask = circleMask;
+    imageSprite.position.set(Math.floor(avatarSize / 2));
 
-    const basicText = new PixiText("AAAA");
-    basicText.style.fill = 0xffffff;
-    basicText.style.align = "center";
-    basicText.style.fontSize = 35;
+    const avatarReady = () => {
+      const circleMask = new PixiGraphics();
+      circleMask.beginFill(0xffffff);
+      const radius = Math.floor(avatarSize / 2);
+      circleMask.drawCircle(radius, radius, radius);
+      circleMask.endFill();
+      circleMask.pivot.set(Math.floor(avatarSize / 2));
+      circleMask.position.set(Math.floor(avatarSize / 2));
 
-    basicText.position.set(0, 200);
-    circleMask.position.set(0, 0);
+      imageSprite.mask = circleMask;
 
-    circleMask.x = 0;
-    circleMask.y = 0;
-    imageSprite.x = 0;
-    imageSprite.y = 0;
+      const basicText = new PixiText(this.options.nickname);
+      basicText.style.fill = 0xffffff;
+      basicText.style.align = "center";
+      basicText.style.fontSize = 35;
+      basicText.pivot.set(Math.floor(basicText.width / 2), Math.floor((basicText.height / 2)));
+      basicText.position.set(Math.floor(avatarSize / 2), Math.floor(avatarSize * 1.3))
 
-    console.log(container.width / 2);
+      console.log(container, basicText);
 
-    container.addChild(imageSprite);
-    //container.addChild(basicText);
-    container.addChild(circleMask);
+      container.addChild(imageSprite);
+      container.addChild(circleMask);
+      container.addChild(basicText);
 
-    console.log(app.view.width / 2, app.view.height / 2);
+      const audioBars = audioVis.getContainer();
+      audioBars.position.set(Math.floor(avatarSize / 2), Math.floor(avatarSize * 2));
 
-    container.pivot.set(
-      app.view.width / 2 - container.width / 2,
-      container.height / 2 - container.height / 2,
-    );
-    container.position.set(app.view.width / 2, app.view.height / 2);
+      container.addChild(audioBars);
 
-    console.log(container);
+      container.pivot.set(Math.floor(avatarSize / 2), Math.floor(container.height / 2));
+      container.position.set(Math.floor(app.view.width / 2), Math.floor(app.view.height / 2));
+    };
+
+    imageSprite.texture.baseTexture.on('loaded', avatarReady);
 
     return container;
   }
@@ -316,12 +319,68 @@ class CameraDemonstration extends CameraEnabledDemonstration {
   }
 }
 
+class AudioVisualizer {
+  self = AudioVisualizer;
+  static BarWidth = 2;
+  static BarSpacing = 3;
+  static BarMinHeight = 5;
+  static BarMaxHeight = 30;
+
+  #container;
+  #audioTrack;
+
+  constructor(audioTrack) {
+    this.#audioTrack = audioTrack;
+
+    this.#container = new PixiContainer();
+
+    setInterval(() => {
+      while(this.#container.children[0]) {
+        this.#container.removeChild(this.#container.children[0]);
+      }
+
+      for (let i = 0; i < 10; i++) {
+        this.#container.addChild(this.#drawBar(i, Math.random() * this.self.BarMaxHeight - this.self.BarMinHeight + this.self.BarMinHeight));
+      }
+
+      this.#container.pivot.set(this.#container.width / 2, this.self.BarMaxHeight);
+    }, 100);
+  }
+
+  start() {
+    // TODO;
+  }
+
+  stop() {
+
+  }
+
+  getContainer() {
+    return this.#container;
+  }
+
+  #drawBar(index = 0, height) {
+    const barPos = index * this.self.BarWidth + index * this.self.BarSpacing;
+
+    const audioBar = new PixiGraphics();
+    audioBar.beginFill(0xffffff);
+    audioBar.drawRect(0, 0, this.self.BarWidth, Math.min(Math.max(height, this.self.BarMinHeight), this.self.BarMaxHeight));
+    audioBar.endFill();
+    audioBar.pivot.set(this.self.BarWidth / 2, audioBar.height / 2);
+    audioBar.position.set(barPos, 0);
+
+    return audioBar;
+  }
+}
+
 class BastyonStreams {
   self = BastyonStreams;
 
   static BackColor = "#000";
   static Wrapper = "#pixi-wrapper";
   static Padding = 20;
+
+  static FallbackAvatarSize = 150;
 
   /**
    * Pixi app wrapping element
@@ -386,10 +445,8 @@ class BastyonStreams {
     return screenMode;
   }
 
-  async gotoCamera() {
-    const cameraMode = new CameraDemonstration(this, {
-      image: "https://i.imgur.com/LzcDKhYh.jpg",
-    });
+  async gotoCamera(options) {
+    const cameraMode = new CameraDemonstration(this, options);
 
     cameraMode.addCameraMedia(
       await navigator.mediaDevices.getUserMedia({ video: true }),
