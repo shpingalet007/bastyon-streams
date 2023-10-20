@@ -10,7 +10,7 @@ import {
 } from "pixi.js";
 import { BrowserToRtmpClient } from "@api.video/browser-to-rtmp-client";
 
-class BaseMediaStreamClass {
+export class BaseMediaStreamClass {
   self = BaseMediaStreamClass;
 
   static MediaStreamResource = class extends PixiVideoResource {
@@ -36,7 +36,7 @@ class BaseMediaStreamClass {
 
   /**
    *
-   * @param {BastyonStreams} parent
+   * @param {BaseStreamControl} parent
    */
   constructor(parent) {
     this.parent = parent;
@@ -81,7 +81,7 @@ class BaseMediaStreamClass {
   }
 }
 
-class CameraEnabledDemonstration extends BaseMediaStreamClass {
+export class CameraEnabledDemonstration extends BaseMediaStreamClass {
   cameraSprite;
 
   /**
@@ -97,7 +97,7 @@ class CameraEnabledDemonstration extends BaseMediaStreamClass {
   isCameraEnabled = () => this.cameraSprite.visible;
 }
 
-class ScreenDemonstration extends CameraEnabledDemonstration {
+export class ScreenDemonstration extends CameraEnabledDemonstration {
   #screenMedia;
   #screenSprite;
 
@@ -202,7 +202,7 @@ class ScreenDemonstration extends CameraEnabledDemonstration {
   }
 }
 
-class CameraDemonstration extends CameraEnabledDemonstration {
+export class CameraDemonstration extends CameraEnabledDemonstration {
   #fallbackContainer;
 
   constructor(parent, options) {
@@ -216,7 +216,10 @@ class CameraDemonstration extends CameraEnabledDemonstration {
    * @param {PixiApplication} app
    */
   attachToApp(app) {
-    this.#fallbackContainer = this.#setupFallbackSprite(app, this.options.image);
+    this.#fallbackContainer = this.#setupFallbackSprite(
+      app,
+      this.options.image,
+    );
     this.cameraSprite = this.#setupSprite(app, this.cameraMedia);
 
     app.stage.addChild(this.#fallbackContainer);
@@ -281,8 +284,14 @@ class CameraDemonstration extends CameraEnabledDemonstration {
       basicText.style.fill = 0xffffff;
       basicText.style.align = "center";
       basicText.style.fontSize = 35;
-      basicText.pivot.set(Math.floor(basicText.width / 2), Math.floor((basicText.height / 2)));
-      basicText.position.set(Math.floor(avatarSize / 2), Math.floor(avatarSize * 1.3))
+      basicText.pivot.set(
+        Math.floor(basicText.width / 2),
+        Math.floor(basicText.height / 2),
+      );
+      basicText.position.set(
+        Math.floor(avatarSize / 2),
+        Math.floor(avatarSize * 1.3),
+      );
 
       console.log(container, basicText);
 
@@ -291,15 +300,24 @@ class CameraDemonstration extends CameraEnabledDemonstration {
       container.addChild(basicText);
 
       const audioBars = audioVis.getContainer();
-      audioBars.position.set(Math.floor(avatarSize / 2), Math.floor(avatarSize * 2));
+      audioBars.position.set(
+        Math.floor(avatarSize / 2),
+        Math.floor(avatarSize * 2),
+      );
 
       container.addChild(audioBars);
 
-      container.pivot.set(Math.floor(avatarSize / 2), Math.floor(container.height / 2));
-      container.position.set(Math.floor(app.view.width / 2), Math.floor(app.view.height / 2));
+      container.pivot.set(
+        Math.floor(avatarSize / 2),
+        Math.floor(container.height / 2),
+      );
+      container.position.set(
+        Math.floor(app.view.width / 2),
+        Math.floor(app.view.height / 2),
+      );
     };
 
-    imageSprite.texture.baseTexture.on('loaded', avatarReady);
+    imageSprite.texture.baseTexture.on("loaded", avatarReady);
 
     return container;
   }
@@ -319,7 +337,7 @@ class CameraDemonstration extends CameraEnabledDemonstration {
   }
 }
 
-class AudioVisualizer {
+export class AudioVisualizer {
   self = AudioVisualizer;
   static BarWidth = 2;
   static BarSpacing = 3;
@@ -335,15 +353,25 @@ class AudioVisualizer {
     this.#container = new PixiContainer();
 
     setInterval(() => {
-      while(this.#container.children[0]) {
+      while (this.#container.children[0]) {
         this.#container.removeChild(this.#container.children[0]);
       }
 
       for (let i = 0; i < 10; i++) {
-        this.#container.addChild(this.#drawBar(i, Math.random() * this.self.BarMaxHeight - this.self.BarMinHeight + this.self.BarMinHeight));
+        this.#container.addChild(
+          this.#drawBar(
+            i,
+            Math.random() * this.self.BarMaxHeight -
+              this.self.BarMinHeight +
+              this.self.BarMinHeight,
+          ),
+        );
       }
 
-      this.#container.pivot.set(this.#container.width / 2, this.self.BarMaxHeight);
+      this.#container.pivot.set(
+        this.#container.width / 2,
+        this.self.BarMaxHeight,
+      );
     }, 100);
   }
 
@@ -351,9 +379,7 @@ class AudioVisualizer {
     // TODO;
   }
 
-  stop() {
-
-  }
+  stop() {}
 
   getContainer() {
     return this.#container;
@@ -364,7 +390,15 @@ class AudioVisualizer {
 
     const audioBar = new PixiGraphics();
     audioBar.beginFill(0xffffff);
-    audioBar.drawRect(0, 0, this.self.BarWidth, Math.min(Math.max(height, this.self.BarMinHeight), this.self.BarMaxHeight));
+    audioBar.drawRect(
+      0,
+      0,
+      this.self.BarWidth,
+      Math.min(
+        Math.max(height, this.self.BarMinHeight),
+        this.self.BarMaxHeight,
+      ),
+    );
     audioBar.endFill();
     audioBar.pivot.set(this.self.BarWidth / 2, audioBar.height / 2);
     audioBar.position.set(barPos, 0);
@@ -373,8 +407,8 @@ class AudioVisualizer {
   }
 }
 
-class BastyonStreams {
-  self = BastyonStreams;
+export class BaseStreamControl {
+  self = BaseStreamControl;
 
   static BackColor = "#000";
   static Wrapper = "#pixi-wrapper";
@@ -410,11 +444,11 @@ class BastyonStreams {
 
   constructor(options = {}) {
     this.#wrapper = document.querySelector(
-      options.wrapper || BastyonStreams.Wrapper,
+      options.wrapper || BaseStreamControl.Wrapper,
     );
 
     this.#app = new PixiApplication({
-      background: options.background || BastyonStreams.BackColor,
+      background: options.background || BaseStreamControl.BackColor,
       resizeTo: this.#wrapper,
       eventMode: "static",
     });
@@ -534,10 +568,10 @@ class BastyonStreams {
         event.x,
         event.y,
         {
-          x1: BastyonStreams.Padding,
-          x2: self.#app.view.width - BastyonStreams.Padding,
-          y1: BastyonStreams.Padding,
-          y2: self.#app.view.height - BastyonStreams.Padding,
+          x1: BaseStreamControl.Padding,
+          x2: self.#app.view.width - BaseStreamControl.Padding,
+          y1: BaseStreamControl.Padding,
+          y2: self.#app.view.height - BaseStreamControl.Padding,
         },
         self.#dragCoords,
         isCheck,
@@ -632,4 +666,11 @@ class BastyonStreams {
   }
 }
 
-export default BastyonStreams;
+export default {
+  BaseMediaStreamClass,
+  CameraEnabledDemonstration,
+  ScreenDemonstration,
+  CameraDemonstration,
+  AudioVisualizer,
+  BaseStreamControl,
+};

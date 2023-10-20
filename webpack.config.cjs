@@ -1,33 +1,32 @@
 const path = require("path");
 const webpack = require("webpack");
 
-const config = {
-  entry: "./src/main.js",
-  output: {
-    filename: "bastyon-streams.min.js",
-    path: path.resolve(__dirname, "dist"),
-    library: {
-      type: "umd",
-      name: "BastyonStreams",
-      export: "default",
-    },
-  },
-  plugins: [],
-  module: {
-    rules: [
-      {
-        test: /\.js$/i,
-        loader: "babel-loader",
-      },
-    ],
-  },
-};
-
 module.exports = (env) => {
-  if (env.production) {
-    config.mode = "production";
-  } else {
-    config.mode = "development";
-  }
-  return config;
+  const getConfig = (fileName, output, exportName) => ({
+    mode: env.production ? "production" : "development",
+    entry: `./src/${fileName}`,
+    output: {
+      filename: output,
+      path: path.resolve(__dirname, "dist"),
+      library: {
+        type: "umd",
+        name: exportName,
+        export: "default",
+      },
+    },
+    plugins: [],
+    module: {
+      rules: [
+        {
+          test: /\.js$/i,
+          loader: "babel-loader",
+        },
+      ],
+    },
+  });
+
+  return [
+    getConfig("main.js", "streams.min.js", "Streamium"),
+    getConfig("bastyon.js", "bastyon-streams.min.js", "BastyonStreams"),
+  ];
 };
