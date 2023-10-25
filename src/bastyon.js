@@ -102,9 +102,8 @@ class BastyonStreams extends BaseStreamControl {
    * @return {{ [key: string]: StreamInfo }}
    */
   static readAllStreamsInfo() {
-    const activeStreamingRaw = window.localStorage.getItem(
-      BastyonStreams.LocalStorageContainer,
-    );
+    const activeStreamingRaw =
+      window.localStorage.getItem(BastyonStreams.LocalStorageContainer) || "{}";
 
     return JSON.parse(activeStreamingRaw);
   }
@@ -116,15 +115,12 @@ class BastyonStreams extends BaseStreamControl {
    * @param {string} address - Account address
    * @return {StreamInfo & { activeStream: boolean }}
    */
-  static readStreamInfo(address) {
-    const activeStreamingRaw = window.localStorage.getItem(
-      BastyonStreams.LocalStorageContainer,
-    );
-    const activeStreaming = JSON.parse(activeStreamingRaw);
+  async readStreamInfo(address) {
+    const activeStreaming = BastyonStreams.readAllStreamsInfo();
 
     if (activeStreaming?.[address]) {
       const liveUuid = activeStreaming[address].uuid;
-      const liveInfo = this.#peertubeProviders.getLiveInfo(liveUuid);
+      const liveInfo = await this.#peertubeProviders.getLiveInfo(liveUuid);
 
       let activeStream = true;
 

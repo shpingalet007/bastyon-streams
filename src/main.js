@@ -184,9 +184,6 @@ export class ScreenDemonstration extends CameraEnabledDemonstration {
   }
 
   destroy(app) {
-    this.#screenSprite.texture.baseTexture.resource.destroy();
-    this.cameraSprite.texture.baseTexture.resource.destroy();
-
     super.stopMediaStream(this.cameraMedia);
     super.stopMediaStream(this.#screenMedia);
 
@@ -204,6 +201,7 @@ export class ScreenDemonstration extends CameraEnabledDemonstration {
 
 export class CameraDemonstration extends CameraEnabledDemonstration {
   #fallbackContainer;
+  #audioVisualizer;
 
   constructor(parent, options) {
     super(parent);
@@ -261,7 +259,7 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
 
     const container = new PixiContainer();
 
-    const audioVis = new AudioVisualizer();
+    this.#audioVisualizer = new AudioVisualizer();
 
     const avatarSize = this.parent.self.FallbackAvatarSize;
 
@@ -299,7 +297,7 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
       container.addChild(circleMask);
       container.addChild(basicText);
 
-      const audioBars = audioVis.getContainer();
+      const audioBars = this.#audioVisualizer.getContainer();
       audioBars.position.set(
         Math.floor(avatarSize / 2),
         Math.floor(avatarSize * 2),
@@ -323,17 +321,18 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
   }
 
   destroy(app) {
-    this.cameraSprite.texture.baseTexture.resource.destroy();
-
     super.stopMediaStream(this.cameraMedia);
 
     app.stage.removeChild(this.cameraSprite);
     this.parent.removeAllEvents(this.cameraSprite);
 
+    this.#audioVisualizer.destroy();
+
     this.cameraSprite = null;
     this.cameraMedia = null;
+    this.parent = null;
 
-    // TODO: Fallback container must be removed here too
+    this.#audioVisualizer = null;
   }
 }
 
@@ -346,13 +345,14 @@ export class AudioVisualizer {
 
   #container;
   #audioTrack;
+  #interval;
 
   constructor(audioTrack) {
     this.#audioTrack = audioTrack;
 
     this.#container = new PixiContainer();
 
-    setInterval(() => {
+    this.#interval = setInterval(() => {
       while (this.#container.children[0]) {
         this.#container.removeChild(this.#container.children[0]);
       }
@@ -380,6 +380,11 @@ export class AudioVisualizer {
   }
 
   stop() {}
+
+  destroy() {
+    clearInterval(this.#interval);
+    this.#container.destroy();
+  }
 
   getContainer() {
     return this.#container;
@@ -414,7 +419,11 @@ export class BaseStreamControl {
   static Wrapper = "#pixi-wrapper";
   static Padding = 20;
 
+  static DestroyedStateError = new Error("StreamControl is already destroyed");
+
   static FallbackAvatarSize = 150;
+
+  isDestroyed = false;
 
   /**
    * Pixi app wrapping element
@@ -460,10 +469,14 @@ export class BaseStreamControl {
   }
 
   mountApp() {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     this.#wrapper.appendChild(this.#app.view);
   }
 
   async gotoScreen() {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const screenMode = new ScreenDemonstration(this);
 
     screenMode.addScreenMedia(await navigator.mediaDevices.getDisplayMedia());
@@ -480,6 +493,8 @@ export class BaseStreamControl {
   }
 
   async gotoCamera(options) {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const cameraMode = new CameraDemonstration(this, options);
 
     cameraMode.addCameraMedia(
@@ -540,18 +555,24 @@ export class BaseStreamControl {
   }
 
   setupDraggable(sprite) {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const events = this.#getEvents();
 
     sprite.on("pointerdown", events.onDragStart, sprite);
   }
 
   setupScalable(sprite) {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const events = this.#getEvents();
 
     sprite.on("wheel", events.constructOnWheel(this.#app), sprite);
   }
 
   removeAllEvents(sprite) {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const events = this.#getEvents();
 
     sprite.off("pointerdown", events.onDragStart, sprite);
@@ -643,6 +664,8 @@ export class BaseStreamControl {
   }
 
   async applyAudioTrack(stream) {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const userMedia = await navigator.mediaDevices.getUserMedia({
       audio: true,
     });
@@ -653,6 +676,8 @@ export class BaseStreamControl {
   }
 
   startStreaming(rtmp) {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
     const stream = this.#app.view.captureStream(30);
     this.applyAudioTrack(stream);
 
@@ -663,6 +688,24 @@ export class BaseStreamControl {
     });
 
     this.#streamer.start();
+  }
+
+  stopStreaming() {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
+    if (!this.#streamer) {
+      return;
+    }
+
+    this.#streamer.stop();
+  }
+
+  destroy() {
+    if (this.isDestroyed) throw this.self.DestroyedStateError;
+
+    this.stopStreaming();
+    this.#app.destroy(true, true);
+    this.isDestroyed = true;
   }
 }
 
