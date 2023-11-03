@@ -83,6 +83,7 @@ export class BaseMediaStreamClass {
 
 export class CameraEnabledDemonstration extends BaseMediaStreamClass {
   cameraSprite;
+  cameraOnStart = false;
 
   /**
    * Provide MediaStream for camera square
@@ -176,6 +177,10 @@ export class ScreenDemonstration extends CameraEnabledDemonstration {
     this.#screenSprite = this.#setupScreenSprite(app, this.#screenMedia);
     this.cameraSprite = this.#setupCameraSprite(app, this.cameraMedia);
 
+    if (!this.cameraOnStart) {
+      this.offCamera();
+    }
+
     app.stage.addChild(this.#screenSprite);
     app.stage.addChild(this.cameraSprite);
 
@@ -219,6 +224,10 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
       this.options.image,
     );
     this.cameraSprite = this.#setupSprite(app, this.cameraMedia);
+
+    if (!this.cameraOnStart) {
+      this.offCamera();
+    }
 
     app.stage.addChild(this.#fallbackContainer);
     app.stage.addChild(this.cameraSprite);
@@ -429,7 +438,11 @@ export class BaseStreamControl {
    * Pixi app wrapping element
    * @type {HTMLElement}
    */
-  #wrapper;
+  wrapper;
+
+  #controlsWrapperClassName = "pixi-controls";
+
+  #controlsConstructor;
 
   /**
    * Pixi app instance
@@ -446,19 +459,24 @@ export class BaseStreamControl {
   /**
    * @type {BaseMediaStreamClass}
    */
-  #current;
+  current;
 
   #dragTarget;
   #dragCoords;
 
   constructor(options = {}) {
-    this.#wrapper = document.querySelector(
+    this.wrapper = document.querySelector(
       options.wrapper || BaseStreamControl.Wrapper,
     );
 
+    if (options.controlsWrapper) {
+      this.#controlsWrapperClassName = options.controlsWrapper;
+    }
+
     this.#app = new PixiApplication({
       background: options.background || BaseStreamControl.BackColor,
-      resizeTo: this.#wrapper,
+      width: options.width || 1280,
+      height: options.height || 720,
       eventMode: "static",
     });
 
@@ -471,7 +489,20 @@ export class BaseStreamControl {
   mountApp() {
     if (this.isDestroyed) throw this.self.DestroyedStateError;
 
-    this.#wrapper.appendChild(this.#app.view);
+    this.wrapper.appendChild(this.#app.view);
+
+    this.#controlsConstructor?.();
+  }
+
+  loadAppControls(constructor) {
+    this.#controlsConstructor = () => {
+      const controlsWrapper = document.createElement("div");
+      controlsWrapper.setAttribute("class", this.#controlsWrapperClassName);
+
+      this.#app.view.parentElement.appendChild(controlsWrapper);
+
+      constructor(controlsWrapper, this.#app.view);
+    };
   }
 
   async gotoScreen() {
@@ -479,15 +510,29 @@ export class BaseStreamControl {
 
     const screenMode = new ScreenDemonstration(this);
 
-    screenMode.addScreenMedia(await navigator.mediaDevices.getDisplayMedia());
+    let returnToFullscreen = false;
+
+    if (document.fullscreenElement === this.#app.view.parentElement) {
+      returnToFullscreen = true;
+    }
+
+    screenMode.addScreenMedia(
+      await navigator.mediaDevices.getDisplayMedia({
+        video: { displaySurface: "monitor" },
+      }),
+    );
     screenMode.addCameraMedia(
       await navigator.mediaDevices.getUserMedia({ video: true }),
     );
 
+    if (returnToFullscreen) {
+      this.#app.view.parentElement.requestFullscreen();
+    }
+
     screenMode.attachToApp(this.#app);
 
-    this.#current?.destroy(this.#app);
-    this.#current = screenMode;
+    this.current?.destroy(this.#app);
+    this.current = screenMode;
 
     return screenMode;
   }
@@ -503,8 +548,8 @@ export class BaseStreamControl {
 
     cameraMode.attachToApp(this.#app);
 
-    this.#current?.destroy(this.#app);
-    this.#current = cameraMode;
+    this.current?.destroy(this.#app);
+    this.current = cameraMode;
 
     return cameraMode;
   }
@@ -675,15 +720,15 @@ export class BaseStreamControl {
     stream.addTrack(audioTrack);
   }
 
-  startStreaming(rtmp) {
+  startStreaming(rtmp, relayServer) {
     if (this.isDestroyed) throw this.self.DestroyedStateError;
 
     const stream = this.#app.view.captureStream(30);
     this.applyAudioTrack(stream);
 
     this.#streamer = new BrowserToRtmpClient(stream, {
-      host: "localhost",
-      port: 1234,
+      host: relayServer.host,
+      port: relayServer.port,
       rtmp: rtmp,
     });
 

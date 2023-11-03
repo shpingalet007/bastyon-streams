@@ -10,63 +10,55 @@
         height: 100%;
       }
       #pixi-wrapper {
+        position: relative;
         width: calc(1920px / 2);
         height: calc(1080px / 2);
       }
+
+      #pixi-wrapper canvas {
+        position: absolute;
+        z-index: -100;
+        top: 50%;
+        left: 50%;
+        width: 100%;
+        transform: translate(-50%, -50%);
+        margin: auto;
+      }
     </style>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"
+    />
+    <link
+      rel="stylesheet"
+      href="https://site-assets.fontawesome.com/releases/v6.4.2/css/all.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://site-assets.fontawesome.com/releases/v6.4.2/css/sharp-solid.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://site-assets.fontawesome.com/releases/v6.4.2/css/sharp-regular.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://site-assets.fontawesome.com/releases/v6.4.2/css/sharp-light.css"
+    />
+    <link rel="stylesheet" href="../static/styles/controls.css" />
   </head>
   <body>
-    <input id="rtmp-link" type="text" placeholder="RTMP link" /><button
-      id="start-stream"
-    >
-      STREAM!
-    </button>
+    <input id="rtmp-link" type="text" placeholder="RTMP link" /><br />
+    <input id="relay-server" type="text" placeholder="Relay server" /><br />
+    <button id="start-stream">STREAM!</button>
     <hr />
-    <button id="switch-camera">Camera mode</button>
-    <button id="switch-screen">Screen mode</button>
-    <button id="toggle-camera">Toggle camera</button>
-    <div id="pixi-wrapper"></div>
+    <div id="pixi-wrapper">
+      <!-- STREAMING APP MOUNT POINT -->
+    </div>
   </body>
   <script src="../dist/bastyon-streams.min.js"></script>
   <script>
-    async function createApp() {
-      const streams = new BastyonStreams();
-      streams.mountApp();
-
-      let streamDemo = null;
-
-      document.querySelector("#toggle-camera").addEventListener("click", () => {
-        if (streamDemo.isCameraEnabled()) {
-          streamDemo.offCamera();
-          return;
-        }
-
-        streamDemo.onCamera();
-      });
-
-      document
-        .querySelector("#switch-camera")
-        .addEventListener("click", async () => {
-          streamDemo = await streams.gotoCamera({
-            image: "../static/avatar.jpg",
-            nickname: "Shpingalet007",
-          });
-        });
-
-      document
-        .querySelector("#switch-screen")
-        .addEventListener("click", async () => {
-          streamDemo = await streams.gotoScreen();
-        });
-
-      document
-        .querySelector("#start-stream")
-        .addEventListener("click", async () => {
-          const rtmpLink = document.querySelector("#rtmp-link").value;
-          streams.startStreaming(rtmpLink);
-        });
-    }
-
-    createApp();
+    const streams = new BastyonStreams();
+    streams.mountApp();
   </script>
 </html>
