@@ -1,7 +1,7 @@
 {
   "name": "bastyon-streams",
   "description": "Bastyon streaming functionality",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "type": "module",
   "main": "src/main.js",
   "files": [
@@ -13,7 +13,8 @@
     "prettify": "prettier --write .",
     "build:prod": "rm -rf dist && webpack --env production",
     "build:debug": "rm -rf dist && webpack --env development",
-    "publish": "npm run lint && npm run prettify && npm run build:prod && npm publish"
+    "publish": "npm run lint && npm run prettify && npm run build:prod && npm publish",
+    "start:test": "http-server . --port 45251 -o /test"
   },
   "repository": {
     "type": "git",
