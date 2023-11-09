@@ -103,10 +103,14 @@ class BastyonStreamsUI {
       this.#modes.push(modeButton);
 
       modeButton.addEventListener("click", (e) => {
-        this.#modes.forEach((mode) => mode.classList.remove("active"));
-        modeButton.classList.add("active");
+        if (modeButton.classList.contains("active")) {
+          return;
+        }
 
         mode.callback.bind(this)(e);
+
+        this.#modes.forEach((mode) => mode.classList.remove("active"));
+        modeButton.classList.add("active");
       });
 
       if (modeName === defaultModeName) {
@@ -136,12 +140,32 @@ class BastyonStreamsUI {
       if (func.type === "trigger") {
         this.#funcStates[funcName] = func.default;
 
-        modeIcon.className = func.iconClasses[func.default];
+        modeIcon.className = func.iconClasses[func.default] || func.iconClasses;
+
+        if (
+          Object.keys(func.classes || {}).length &&
+          func.classes[func.default]
+        ) {
+          modeButton.className += func.classes[func.default];
+        }
 
         modeButton.addEventListener("click", (e) => {
+          console.log("Calling UI state");
+
           const newState = !this.#funcStates[funcName];
           this.#funcStates[funcName] = newState;
-          modeIcon.className = func.iconClasses[newState];
+
+          if (
+            Object.keys(func.classes || {}).length &&
+            func.classes[newState]
+          ) {
+            modeButton.className =
+              func.className + " " + func.classes[newState];
+          } else {
+            modeButton.className = func.className;
+          }
+
+          modeIcon.className = func.iconClasses[newState] || func.iconClasses;
 
           func.callback.bind(this)(e);
         });
@@ -192,10 +216,7 @@ class BastyonStreamsUI {
         iconClasses: "fa-solid fa-video",
         hint: "Switch to camera mode",
         callback: () => {
-          this.#app.gotoCamera({
-            image: "../static/avatar.jpg",
-            nickname: "DummyNick",
-          });
+          this.#app.gotoCamera();
         },
       },
     },
@@ -204,8 +225,12 @@ class BastyonStreamsUI {
   LeftButtons = {
     StartStreaming: {
       enabled: true,
-      type: "button",
+      type: "trigger",
+      default: false,
       className: "toggle-stream",
+      classes: {
+        true: "active",
+      },
       iconClasses: "fa-solid fa-signal-stream",
       hint: "Start/stop streaming",
       callback: () => {
@@ -261,6 +286,11 @@ class BastyonStreamsUI {
     },
   };
 
+  #emit(eventName, data) {
+    const event = new CustomEvent(eventName, { detail: data });
+    this.#app.dispatchEvent(event);
+  }
+
   RightButtons = {
     Fullscreen: {
       enabled: true,
@@ -269,12 +299,28 @@ class BastyonStreamsUI {
       iconClasses: "fa-solid fa-expand",
       hint: "Toggle fullscreen",
       callback: () => {
+        const fullscreenChange = () => {
+          if (document.fullscreenElement === this.#appWrapper) {
+            this.#emit("fullscreen-in");
+            return;
+          }
+
+          this.#appWrapper.removeEventListener(
+            "fullscreenchange",
+            fullscreenChange,
+          );
+
+          this.#emit("fullscreen-out");
+        };
+
         if (document.fullscreenElement) {
           document.exitFullscreen();
           return;
         }
 
         this.#appWrapper.requestFullscreen();
+
+        this.#appWrapper.addEventListener("fullscreenchange", fullscreenChange);
       },
     },
     PictureInPicture: {
@@ -313,9 +359,21 @@ class BastyonStreams extends BaseStreamControl {
    */
   constructor(options, peertubeProviders) {
     super(options);
+
+    this.user = {
+      image: options.user.image,
+      nickname: options.user.nickname,
+    };
+
+    delete options.user;
+
     this.#peertubeProviders = peertubeProviders;
 
     this.ui = new BastyonStreamsUI(this);
+
+    this.gotoCamera(this.user).then((cameraMode) => {
+      this.current = cameraMode;
+    });
   }
 
   async gotoScreen(...args) {
@@ -331,8 +389,8 @@ class BastyonStreams extends BaseStreamControl {
     return screenMode;
   }
 
-  async gotoCamera(...args) {
-    const cameraMode = await super.gotoCamera(...args);
+  async gotoCamera() {
+    const cameraMode = await super.gotoCamera(this.user);
     this.ui.switchMode("CameraMode");
 
     if (!this.cameraState) {

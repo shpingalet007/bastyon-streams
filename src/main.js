@@ -206,7 +206,9 @@ export class ScreenDemonstration extends CameraEnabledDemonstration {
 
 export class CameraDemonstration extends CameraEnabledDemonstration {
   #fallbackContainer;
-  #audioVisualizer;
+
+  // TODO: Fix bug with not able to reinit
+  //#audioVisualizer;
 
   constructor(parent, options) {
     super(parent);
@@ -243,10 +245,6 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
 
     const streamSize = super.getMediaStreamSize(mediaStream);
 
-    cameraSprite.anchor.set(0);
-    cameraSprite.x = 0;
-    cameraSprite.y = 0;
-
     const scaleX = app.view.width / streamSize.width;
     const scaleY = app.view.height / streamSize.height;
 
@@ -260,6 +258,10 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
     cameraSprite.width = fittedWidth;
     cameraSprite.height = fittedHeight;
 
+    cameraSprite.anchor.set(0);
+    cameraSprite.x = Math.floor((app.view.width - fittedWidth) / 2);
+    cameraSprite.y = Math.floor((app.view.height - fittedHeight) / 2);
+
     return cameraSprite;
   }
 
@@ -268,7 +270,7 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
 
     const container = new PixiContainer();
 
-    this.#audioVisualizer = new AudioVisualizer();
+    // this.#audioVisualizer = new AudioVisualizer();
 
     const avatarSize = this.parent.self.FallbackAvatarSize;
 
@@ -306,13 +308,13 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
       container.addChild(circleMask);
       container.addChild(basicText);
 
-      const audioBars = this.#audioVisualizer.getContainer();
+      /*const audioBars = this.#audioVisualizer.getContainer();
       audioBars.position.set(
         Math.floor(avatarSize / 2),
         Math.floor(avatarSize * 2),
       );
 
-      container.addChild(audioBars);
+      container.addChild(audioBars);*/
 
       container.pivot.set(
         Math.floor(avatarSize / 2),
@@ -333,15 +335,18 @@ export class CameraDemonstration extends CameraEnabledDemonstration {
     super.stopMediaStream(this.cameraMedia);
 
     app.stage.removeChild(this.cameraSprite);
+    app.stage.removeChild(this.#fallbackContainer);
     this.parent.removeAllEvents(this.cameraSprite);
 
-    this.#audioVisualizer.destroy();
+    // this.#audioVisualizer.destroy();
 
     this.cameraSprite = null;
     this.cameraMedia = null;
     this.parent = null;
 
-    this.#audioVisualizer = null;
+    this.#fallbackContainer = null;
+
+    // this.#audioVisualizer = null;
   }
 }
 
@@ -421,7 +426,7 @@ export class AudioVisualizer {
   }
 }
 
-export class BaseStreamControl {
+export class BaseStreamControl extends EventTarget {
   self = BaseStreamControl;
 
   static BackColor = "#000";
@@ -464,7 +469,13 @@ export class BaseStreamControl {
   #dragTarget;
   #dragCoords;
 
+  #resizeObserver;
+
+  isStreaming = false;
+
   constructor(options = {}) {
+    super();
+
     this.wrapper = document.querySelector(
       options.wrapper || BaseStreamControl.Wrapper,
     );
@@ -479,6 +490,8 @@ export class BaseStreamControl {
       height: options.height || 720,
       eventMode: "static",
     });
+
+    this.#fitToPlayer();
 
     this.#app.stage.eventMode = "static";
     this.#app.stage.hitArea = this.#app.screen;
@@ -552,6 +565,39 @@ export class BaseStreamControl {
     this.current = cameraMode;
 
     return cameraMode;
+  }
+
+  #fitToPlayer() {
+    const wrapper = this.wrapper;
+    const appCanvas = this.#app.view;
+
+    this.#resizeObserver = new ResizeObserver(() => {
+      const appCanvas = this.#app.view;
+
+      const canvasWidth = appCanvas.width;
+      const canvasHeight = appCanvas.height;
+      const parentWidth = this.wrapper.clientWidth;
+      const parentHeight = this.wrapper.clientHeight;
+      const aspectRatio = canvasWidth / canvasHeight;
+
+      function resizeCanvas() {
+        let newWidth, newHeight;
+        if (parentWidth / parentHeight > aspectRatio) {
+          newWidth = parentHeight * aspectRatio;
+          newHeight = parentHeight;
+        } else {
+          newWidth = parentWidth;
+          newHeight = parentWidth / aspectRatio;
+        }
+
+        appCanvas.style.width = `${newWidth}px`;
+        appCanvas.style.height = `${newHeight}px`;
+      }
+
+      resizeCanvas();
+    });
+
+    this.#resizeObserver.observe(wrapper);
   }
 
   #spriteBoxedMovement(
@@ -723,6 +769,8 @@ export class BaseStreamControl {
   startStreaming(rtmp, relayServer) {
     if (this.isDestroyed) throw this.self.DestroyedStateError;
 
+    this.isStreaming = true;
+
     const stream = this.#app.view.captureStream(30);
     this.applyAudioTrack(stream);
 
@@ -738,6 +786,8 @@ export class BaseStreamControl {
   stopStreaming() {
     if (this.isDestroyed) throw this.self.DestroyedStateError;
 
+    this.isStreaming = false;
+
     if (!this.#streamer) {
       return;
     }
@@ -747,6 +797,8 @@ export class BaseStreamControl {
 
   destroy() {
     if (this.isDestroyed) throw this.self.DestroyedStateError;
+
+    this.#resizeObserver.disconnect();
 
     this.stopStreaming();
     this.#app.destroy(true, true);
