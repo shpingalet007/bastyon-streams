@@ -26,7 +26,7 @@ module.exports = (env) => {
   });
 
   return [
-    getConfig("main.js", "streams.min.js", "Streamium"),
-    getConfig("bastyon.js", "bastyon-streams.min.js", "BastyonStreams"),
+    getConfig("main.js", "streams.min.js", "StreamiumCreator"),
+    getConfig("bastyon.js", "bastyon-streams.min.js", "BastyonStreamsCreator"),
   ];
 };
