@@ -38,6 +38,7 @@ const PublishedState = {
  * @typedef {{
  *   uuid: string,
  * 	 server: string,
+ * 	 postTxid?: string,
  * }} StreamInfo
  */
 
@@ -213,7 +214,7 @@ export default function (Pixi) {
       modes: {
         ScreenMode: {
           className: "screen-mode",
-          iconClasses: "fa-solid fa-desktop",
+          iconClasses: "fas fa-desktop",
           hint: "Switch to screen mode",
           callback: () => {
             this.#app.gotoScreen();
@@ -221,7 +222,7 @@ export default function (Pixi) {
         },
         CameraMode: {
           className: "camera-mode",
-          iconClasses: "fa-solid fa-video",
+          iconClasses: "fas fa-camera",
           hint: "Switch to camera mode",
           callback: () => {
             this.#app.gotoCamera();
@@ -239,7 +240,7 @@ export default function (Pixi) {
         classes: {
           true: "active",
         },
-        iconClasses: "fa-solid fa-signal-stream",
+        iconClasses: "fas fa-circle",
         hint: "Start/stop streaming",
         callback: () => {
           const rtmpLink = document.querySelector("#rtmp-link").value;
@@ -257,7 +258,7 @@ export default function (Pixi) {
         enabled: false,
         type: "button",
         className: "stream-file",
-        iconClasses: "fa-solid fa-clapperboard",
+        iconClasses: "fas fa-clapperboard",
         hint: "Stream file from list",
         callback: () => {
           alert("FILE STREAM LIST TOGGLED");
@@ -270,7 +271,7 @@ export default function (Pixi) {
         enabled: false,
         type: "button",
         className: "invite-speaker",
-        iconClasses: "fa-solid fa-phone-plus",
+        iconClasses: "fas fa-phone-plus",
         hint: "Invite speaker",
         callback: () => {
           alert("SPEAKER INVITE");
@@ -282,8 +283,8 @@ export default function (Pixi) {
         default: BastyonStreams.CameraOnStart,
         className: "toggle-camera",
         iconClasses: {
-          false: "fa-sharp fa-regular fa-camera-web-slash",
-          true: "fa-sharp fa-regular fa-camera-web",
+          false: "fas fa-video-slash",
+          true: "fas fa-video",
         },
         hint: "Toggle camera on/off",
         callback: () => {
@@ -302,7 +303,7 @@ export default function (Pixi) {
         enabled: true,
         type: "button",
         className: "toggle-fullscreen",
-        iconClasses: "fa-solid fa-expand",
+        iconClasses: "fas fa-expand",
         hint: "Toggle fullscreen",
         callback: () => {
           const fullscreenChange = () => {
@@ -336,7 +337,7 @@ export default function (Pixi) {
         enabled: true,
         type: "button",
         className: "toggle-picmode",
-        iconClasses: "fa-solid fa-arrow-up-right-from-square",
+        iconClasses: "fas fa-external-link-alt",
         hint: "Toggle picture in picture",
         callback: () => {
           this.#app.unmountApp("_pixistream");
