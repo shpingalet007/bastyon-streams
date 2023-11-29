@@ -1,14 +1,15 @@
 .pixi-controls {
+  z-index: 1;
   position: absolute;
   bottom: 0;
   display: flex;
   justify-content: center;
   align-items: center;
   width: 100%;
-  height: 80px;
+  height: 5em;
   background: #00000040;
   box-sizing: border-box;
-  padding: 15px;
+  padding: 0.5em;
   backdrop-filter: blur(4px);
   border-top: 1px solid #00000030;
 }
@@ -18,20 +19,20 @@
   align-items: center;
   position: absolute;
   left: 0;
-  margin: 0 5px 0 15px;
+  margin-left: 1em;
 }
 
 .pixi-controls .right {
   position: absolute;
   right: 0;
-  margin: 0 15px 0 5px;
+  margin-right: 1em;
 }
 
 .pixi-controls .left button,
 .pixi-controls .right button {
-  width: 40px;
-  height: 40px;
-  font-size: 12pt;
+  width: 2.5em;
+  height: 2.5em;
+  font-size: 1em;
 }
 
 .pixi-controls .toggle-stream {
@@ -54,8 +55,8 @@
   align-self: flex-start;
   background: #ffffff80;
   border-radius: 10000px;
-  padding: 5px;
-  margin: 0 5px 0 0;
+  padding: 0.3em;
+  margin-right: 0.3em;
 }
 
 .pixi-controls .modes button {
@@ -72,17 +73,21 @@
 }
 
 .pixi-controls button {
-  cursor: pointer;
+  display: flex;
+  float: left;
+  align-items: center;
+  justify-content: center;
   position: relative;
-  width: 50px;
-  height: 50px;
+  cursor: pointer;
+  width: 2.6em;
+  height: 2.6em;
   background: #ffffff80;
   color: #000;
   text-shadow: 0 0 2px #ffffffaa;
-  font-size: 15pt;
+  font-size: 1.2em;
   border: 2px solid #0000003b;
   border-radius: 10000px;
-  margin: 0 5px;
+  margin: 0 0.3em;
 }
 
 .pixi-controls > button:hover,
