@@ -444,6 +444,27 @@ export default function (Pixi) {
     }
 
     /**
+     * Updates active stream information in the LocalStorage container.
+     *
+     * @param {string} address - Account address
+     * @param {StreamInfo} streamInfoPartial - Partial stream information
+     * @return void
+     */
+    static updateStreamInfo(address, streamInfoPartial) {
+      const activeStreams = BastyonStreams.readAllStreamsInfo();
+
+      activeStreams[address] = {
+        ...activeStreams[address],
+        ...streamInfoPartial,
+      };
+
+      window.localStorage.setItem(
+        BastyonStreams.LocalStorageContainer,
+        JSON.stringify(activeStreams),
+      );
+    }
+
+    /**
      * Removes active stream information in the LocalStorage container.
      *
      * @param {string} address - Account address
@@ -469,7 +490,7 @@ export default function (Pixi) {
     static getStreamInfo(address) {
       const activeStreams = BastyonStreams.readAllStreamsInfo();
 
-      return activeStreams[address];
+      return activeStreams[address] || {};
     }
 
     /**
