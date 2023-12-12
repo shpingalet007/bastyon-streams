@@ -39,6 +39,7 @@ const PublishedState = {
  *   uuid: string,
  * 	 server: string,
  * 	 postTxid?: string,
+ * 	 peertubeUrl?: string,
  * }} StreamInfo
  */
 
@@ -50,7 +51,8 @@ export default function (Pixi) {
     #self = BastyonStreamsUI;
 
     #appWrapper;
-    #mountElement;
+    #mainControlsMountElement;
+    #topControlsMountElement;
     #leftPanel;
     #rightPanel;
     #modes = [];
@@ -59,20 +61,27 @@ export default function (Pixi) {
     #app;
 
     constructor(app) {
-      const controlsWrapper = document.createElement("div");
-      controlsWrapper.className = "pixi-controls";
+      const mainControlsWrapper = document.createElement("div");
+      mainControlsWrapper.className = "pixi-main-controls";
 
-      app.wrapper.appendChild(controlsWrapper);
+      const topControlsWrapper = document.createElement("div");
+      topControlsWrapper.className = "pixi-top-controls";
+
+      app.wrapper.appendChild(mainControlsWrapper);
+      app.wrapper.appendChild(topControlsWrapper);
 
       this.#app = app;
       this.#appWrapper = app.wrapper;
-      this.#mountElement = controlsWrapper;
+      this.#mainControlsMountElement = mainControlsWrapper;
+      this.#topControlsMountElement = topControlsWrapper;
 
       this.#constructBaseDOM();
       this.#constructModeSwitcher(this.#leftPanel);
       this.#constructButtons(this.LeftButtons, this.#leftPanel);
-      this.#constructButtons(this.MainButtons, this.#mountElement);
+      this.#constructButtons(this.MainButtons, this.#mainControlsMountElement);
       this.#constructButtons(this.RightButtons, this.#rightPanel);
+
+      this.#constructMediaChangeInputs(this.#topControlsMountElement);
     }
 
     #constructBaseDOM() {
@@ -82,8 +91,8 @@ export default function (Pixi) {
       this.#rightPanel = document.createElement("div");
       this.#rightPanel.className = "right";
 
-      this.#mountElement.appendChild(this.#leftPanel);
-      this.#mountElement.appendChild(this.#rightPanel);
+      this.#mainControlsMountElement.appendChild(this.#leftPanel);
+      this.#mainControlsMountElement.appendChild(this.#rightPanel);
     }
 
     #constructModeSwitcher(mountElement) {
@@ -159,8 +168,6 @@ export default function (Pixi) {
           }
 
           modeButton.addEventListener("click", (e) => {
-            console.log("Calling UI state");
-
             const newState = !this.#funcStates[funcName];
             this.#funcStates[funcName] = newState;
 
@@ -192,6 +199,57 @@ export default function (Pixi) {
       });
     }
 
+    #constructMediaChangeInputs(mountElement) {
+      const cameraSelectInput = document.createElement("select");
+      cameraSelectInput.className = "camera-select";
+
+      const microphoneSelectInput = document.createElement("select");
+      microphoneSelectInput.className = "microphone-select";
+
+      async function populateMediaChangeInputs() {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === "videoinput");
+        const audioDevices = devices.filter((d) => d.kind === "audioinput");
+
+        videoDevices.forEach((d, i) => {
+          const deviceOption = document.createElement("option");
+          deviceOption.setAttribute("value", d.deviceId);
+
+          const fallbackName =
+            d.label || `Camera device ${i} (${d.deviceId.slice(0, 7)})`;
+
+          deviceOption.textContent = d.label || fallbackName;
+
+          cameraSelectInput.appendChild(deviceOption);
+        });
+
+        audioDevices.forEach((d, i) => {
+          const deviceOption = document.createElement("option");
+          deviceOption.setAttribute("value", d.deviceId);
+
+          const fallbackName =
+            d.label || `Audio device ${i} (${d.deviceId.slice(0, 7)})`;
+
+          deviceOption.textContent = fallbackName;
+
+          microphoneSelectInput.appendChild(deviceOption);
+        });
+      }
+
+      mountElement.appendChild(cameraSelectInput);
+      mountElement.appendChild(microphoneSelectInput);
+
+      cameraSelectInput.addEventListener("change", () => {
+        this.#app.changeCameraDevice(cameraSelectInput.value);
+      });
+
+      microphoneSelectInput.addEventListener("change", () => {
+        this.#app.changeAudioDevice(microphoneSelectInput.value);
+      });
+
+      populateMediaChangeInputs();
+    }
+
     switchMode(modeName) {
       this.#modes.forEach((mode) => mode.classList.remove("active"));
 
@@ -204,7 +262,9 @@ export default function (Pixi) {
       const cameraIconClassName = `.${this.MainButtons.ToggleCamera.className} i`;
       const newIcon = this.MainButtons.ToggleCamera.iconClasses[state];
 
-      this.#mountElement.querySelector(cameraIconClassName).className = newIcon;
+      this.#mainControlsMountElement.querySelector(
+        cameraIconClassName,
+      ).className = newIcon;
 
       this.#funcStates.ToggleCamera = state;
     }
@@ -243,15 +303,7 @@ export default function (Pixi) {
         iconClasses: "fas fa-circle",
         hint: "Start/stop streaming",
         callback: () => {
-          const rtmpLink = document.querySelector("#rtmp-link").value;
-          const relayServer = document
-            .querySelector("#relay-server")
-            .value.split(":");
-
-          this.#app.startStreaming(rtmpLink, {
-            host: relayServer[0],
-            port: relayServer[1],
-          });
+          this.#app.startStreaming();
         },
       },
       StreamFile: {
@@ -289,6 +341,20 @@ export default function (Pixi) {
         hint: "Toggle camera on/off",
         callback: () => {
           this.#app.toggleCamera();
+        },
+      },
+      ToggleMicrophone: {
+        enabled: true,
+        type: "trigger",
+        default: BastyonStreams.MicrophoneOnStart,
+        className: "toggle-microphone",
+        iconClasses: {
+          false: "fas fa-microphone-slash",
+          true: "fas fa-microphone",
+        },
+        hint: "Toggle microphone on/off",
+        callback: () => {
+          this.#app.toggleMicrophone();
         },
       },
     };
@@ -360,6 +426,7 @@ export default function (Pixi) {
     #peertubeProviders = {};
 
     static CameraOnStart = false;
+    static MicrophoneOnStart = false;
 
     cameraState = this.self.CameraOnStart;
 
@@ -375,6 +442,8 @@ export default function (Pixi) {
         image: options.user.image,
         nickname: options.user.nickname,
       };
+
+      this.streamCredentials = options.streamCredentials;
 
       delete options.user;
 
@@ -423,6 +492,20 @@ export default function (Pixi) {
         this.ui.setCameraState(true);
         this.cameraState = true;
       }
+    }
+
+    async toggleMicrophone() {
+      const audioStream = await this.audioStream;
+      const state = audioStream.getAudioTracks()[0].enabled;
+      audioStream.getAudioTracks()[0].enabled = !state;
+    }
+
+    startStreaming() {
+      const rtmpLink = `${this.streamCredentials.server}/${this.streamCredentials.uuid}`;
+      super.startStreaming(rtmpLink, {
+        host: "localhost",
+        port: "1234",
+      });
     }
 
     /**

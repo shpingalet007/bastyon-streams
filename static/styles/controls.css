@@ -1,4 +1,21 @@
-.pixi-controls {
+.pixi-top-controls {
+  height: 30px;
+  padding: 1em;
+}
+
+.pixi-top-controls select {
+  outline: none;
+  width: 20em;
+  font-size: 0.6em;
+  background: #ffffff80;
+  padding: 0.3em 0.5em;
+  border-radius: 10000px;
+  border: 2px solid #0000003b;
+  margin-bottom: 0.5em;
+  margin-right: 1em;
+}
+
+.pixi-main-controls {
   z-index: 1;
   position: absolute;
   bottom: 0;
@@ -14,7 +31,7 @@
   border-top: 1px solid #00000030;
 }
 
-.pixi-controls .left {
+.pixi-main-controls .left {
   display: flex;
   align-items: center;
   position: absolute;
@@ -22,35 +39,35 @@
   margin-left: 1em;
 }
 
-.pixi-controls .right {
+.pixi-main-controls .right {
   position: absolute;
   right: 0;
   margin-right: 1em;
 }
 
-.pixi-controls .left button,
-.pixi-controls .right button {
+.pixi-main-controls .left button,
+.pixi-main-controls .right button {
   width: 2.5em;
   height: 2.5em;
   font-size: 1em;
 }
 
-.pixi-controls .toggle-stream {
+.pixi-main-controls .toggle-stream {
   background: #ff242480;
   color: #fff;
   text-shadow: 0 0 2px #000000aa;
 }
 
-.pixi-controls .toggle-stream:hover {
+.pixi-main-controls .toggle-stream:hover {
   background: #ff2424cc;
 }
 
-.pixi-controls .toggle-stream.active {
+.pixi-main-controls .toggle-stream.active {
   animation: Pulse 1s linear infinite;
   animation-direction: alternate;
 }
 
-.pixi-controls .modes {
+.pixi-main-controls .modes {
   float: left;
   align-self: flex-start;
   background: #ffffff80;
@@ -59,20 +76,20 @@
   margin-right: 0.3em;
 }
 
-.pixi-controls .modes button {
+.pixi-main-controls .modes button {
   margin: 0;
   border: 0;
   background: none;
 }
 
-.pixi-controls .modes button.active {
+.pixi-main-controls .modes button.active {
   cursor: inherit;
   background: #48484880;
   color: #fff;
   text-shadow: 0 0 2px #000000aa;
 }
 
-.pixi-controls button {
+.pixi-main-controls button {
   display: flex;
   float: left;
   align-items: center;
@@ -90,13 +107,13 @@
   margin: 0 0.3em;
 }
 
-.pixi-controls > button:hover,
-.pixi-controls > div > button:hover {
+.pixi-main-controls > button:hover,
+.pixi-main-controls > div > button:hover {
   background: #ffffffcc;
   transition: background-color ease-in 0.05s;
 }
 
-.pixi-controls button::after {
+.pixi-main-controls button::after {
   opacity: 0;
   content: attr(data-title);
   position: absolute;
@@ -116,7 +133,7 @@
   text-shadow: none;
 }
 
-.pixi-controls button:hover::after {
+.pixi-main-controls button:hover::after {
   opacity: 1;
   transition: opacity ease-in 0.05s 1s;
 }

@@ -94,6 +94,11 @@ export default function (Pixi) {
     cameraSprite;
     cameraOnStart = false;
 
+    constructor(parent) {
+      super();
+      this.parent = parent;
+    }
+
     /**
      * Provide MediaStream for camera square
      * @param {MediaStream} mediaStream
@@ -110,6 +115,8 @@ export default function (Pixi) {
   class ScreenDemonstration extends CameraEnabledDemonstration {
     #screenMedia;
     #screenSprite;
+
+    #videoChangeListener;
 
     /**
      * Provide MediaStream for screen demonstration
@@ -195,9 +202,45 @@ export default function (Pixi) {
 
       this.parent.setupDraggable(this.cameraSprite);
       this.parent.setupScalable(this.cameraSprite);
+
+      this.#videoChangeListener = async (data) => {
+        const newCameraMedia = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: data.detail },
+        });
+
+        this.changeCameraDevice(app, newCameraMedia);
+      };
+
+      this.parent.addEventListener(
+        "video-device-change",
+        this.#videoChangeListener,
+      );
+    }
+
+    changeCameraDevice(app, newCameraMedia) {
+      const prevCameraMedia = this.cameraMedia;
+      const prevCameraSprite = this.cameraSprite;
+
+      this.cameraMedia = newCameraMedia;
+      this.cameraSprite = this.#setupCameraSprite(app, newCameraMedia);
+
+      app.stage.addChild(this.cameraSprite);
+
+      super.stopMediaStream(prevCameraMedia);
+
+      app.stage.removeChild(prevCameraSprite);
+      this.parent.removeAllEvents(prevCameraSprite);
+
+      this.parent.setupDraggable(this.cameraSprite);
+      this.parent.setupScalable(this.cameraSprite);
     }
 
     destroy(app) {
+      this.parent.removeEventListener(
+        "video-device-change",
+        this.#videoChangeListener,
+      );
+
       super.stopMediaStream(this.cameraMedia);
       super.stopMediaStream(this.#screenMedia);
 
@@ -216,8 +259,10 @@ export default function (Pixi) {
   class CameraDemonstration extends CameraEnabledDemonstration {
     #fallbackContainer;
 
-    // TODO: Fix bug with not able to reinit
-    //#audioVisualizer;
+    #audioVisualizer;
+
+    #videoChangeListener;
+    #audioChangeListener;
 
     constructor(parent, options) {
       super(parent);
@@ -242,6 +287,28 @@ export default function (Pixi) {
 
       app.stage.addChild(this.#fallbackContainer);
       app.stage.addChild(this.cameraSprite);
+
+      this.#videoChangeListener = async (data) => {
+        const newCameraMedia = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: data.detail },
+        });
+
+        this.changeCameraDevice(app, newCameraMedia);
+      };
+
+      this.#audioChangeListener = async (data) => {
+        this.changeAudioDevice(app, data.detail.audioStream);
+      };
+
+      this.parent.addEventListener(
+        "audio-device-change",
+        this.#audioChangeListener,
+      );
+
+      this.parent.addEventListener(
+        "video-device-change",
+        this.#videoChangeListener,
+      );
     }
 
     /**
@@ -250,6 +317,8 @@ export default function (Pixi) {
      * @param {MediaStream} mediaStream
      */
     #setupSprite(app, mediaStream) {
+      const container = new PixiContainer();
+
       const cameraSprite = super.createSpriteFromMediaStream(mediaStream);
 
       const streamSize = super.getMediaStreamSize(mediaStream);
@@ -262,8 +331,6 @@ export default function (Pixi) {
       let fittedWidth = streamSize.width * minScale;
       let fittedHeight = streamSize.height * minScale;
 
-      console.log(fittedWidth, fittedHeight);
-
       cameraSprite.width = fittedWidth;
       cameraSprite.height = fittedHeight;
 
@@ -271,7 +338,19 @@ export default function (Pixi) {
       cameraSprite.x = Math.floor((app.view.width - fittedWidth) / 2);
       cameraSprite.y = Math.floor((app.view.height - fittedHeight) / 2);
 
-      return cameraSprite;
+      const cameraBackground = new PixiGraphics();
+
+      cameraBackground.beginFill(0x000000);
+      cameraBackground.drawRect(0, 0, app.view.width, app.view.height);
+      cameraBackground.endFill();
+
+      container.addChild(cameraBackground);
+      container.addChild(cameraSprite);
+
+      container.width = app.view.width;
+      container.height = app.view.height;
+
+      return container;
     }
 
     #setupFallbackSprite(app, image) {
@@ -279,13 +358,15 @@ export default function (Pixi) {
 
       const container = new PixiContainer();
 
-      // this.#audioVisualizer = new AudioVisualizer();
+      this.#audioVisualizer = new AudioVisualizer(this.parent.audioStream);
 
       const avatarSize = this.parent.self.FallbackAvatarSize;
 
       const imageSprite = PixiSprite.from(image);
       imageSprite.anchor.set(0.5);
       imageSprite.position.set(Math.floor(avatarSize / 2));
+
+      const isAvatarLoaded = imageSprite.texture.baseTexture.realHeight;
 
       const avatarReady = () => {
         const circleMask = new PixiGraphics();
@@ -311,19 +392,9 @@ export default function (Pixi) {
           Math.floor(avatarSize * 1.3),
         );
 
-        console.log(container, basicText);
-
         container.addChild(imageSprite);
         container.addChild(circleMask);
         container.addChild(basicText);
-
-        /*const audioBars = this.#audioVisualizer.getContainer();
-				audioBars.position.set(
-					Math.floor(avatarSize / 2),
-					Math.floor(avatarSize * 2),
-				);
-
-				container.addChild(audioBars);*/
 
         container.pivot.set(
           Math.floor(avatarSize / 2),
@@ -333,21 +404,74 @@ export default function (Pixi) {
           Math.floor(app.view.width / 2),
           Math.floor(app.view.height / 2),
         );
+
+        this.#attachAudioVisualizer(container);
       };
 
-      imageSprite.texture.baseTexture.on("loaded", avatarReady);
+      if (isAvatarLoaded) {
+        avatarReady();
+      } else {
+        imageSprite.texture.baseTexture.once("loaded", avatarReady);
+      }
 
       return container;
     }
 
+    #attachAudioVisualizer(container) {
+      const avatarSize = this.parent.self.FallbackAvatarSize;
+      const audioBars = this.#audioVisualizer.getContainer();
+
+      audioBars.position.set(
+        Math.floor(avatarSize / 2),
+        Math.floor(avatarSize * 2),
+      );
+
+      container.addChild(audioBars);
+    }
+
+    changeCameraDevice(app, newCameraMedia) {
+      const prevCameraMedia = this.cameraMedia;
+      const prevCameraSprite = this.cameraSprite;
+
+      this.cameraMedia = newCameraMedia;
+      this.cameraSprite = this.#setupSprite(app, newCameraMedia);
+
+      app.stage.addChild(this.cameraSprite);
+
+      super.stopMediaStream(prevCameraMedia);
+
+      app.stage.removeChild(prevCameraSprite);
+      this.parent.removeAllEvents(prevCameraSprite);
+    }
+
+    changeAudioDevice(app, newAudioMedia) {
+      if (this.#audioVisualizer) {
+        this.#audioVisualizer.destroy();
+      }
+
+      this.#audioVisualizer = new AudioVisualizer(newAudioMedia);
+
+      this.#attachAudioVisualizer(this.#fallbackContainer);
+    }
+
     destroy(app) {
+      this.parent.removeEventListener(
+        "video-device-change",
+        this.#videoChangeListener,
+      );
+
+      this.parent.removeEventListener(
+        "audio-device-change",
+        this.#audioChangeListener,
+      );
+
       super.stopMediaStream(this.cameraMedia);
 
       app.stage.removeChild(this.cameraSprite);
       app.stage.removeChild(this.#fallbackContainer);
       this.parent.removeAllEvents(this.cameraSprite);
 
-      // this.#audioVisualizer.destroy();
+      this.#audioVisualizer.destroy();
 
       this.cameraSprite = null;
       this.cameraMedia = null;
@@ -355,7 +479,7 @@ export default function (Pixi) {
 
       this.#fallbackContainer = null;
 
-      // this.#audioVisualizer = null;
+      this.#audioVisualizer = null;
     }
   }
 
@@ -370,21 +494,57 @@ export default function (Pixi) {
     #audioTrack;
     #interval;
 
-    constructor(audioTrack) {
-      this.#audioTrack = audioTrack;
-
+    constructor(audioStream) {
       this.#container = new PixiContainer();
 
+      this.#initialize(audioStream);
+    }
+
+    async #initialize(audioStream) {
+      this.#audioTrack = await audioStream;
+
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+      const audioSource = audioCtx.createMediaStreamSource(this.#audioTrack);
+      const analyser = audioCtx.createAnalyser();
+      audioSource.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      analyser.fftSize = 64;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const audioData = new Uint8Array(bufferLength);
+
       this.#interval = setInterval(() => {
+        analyser.getByteFrequencyData(audioData);
+
         while (this.#container.children[0]) {
           this.#container.removeChild(this.#container.children[0]);
         }
 
-        for (let i = 0; i < 10; i++) {
+        const barsCount = 14;
+
+        const getFreqLevel = (i) => {
+          const lowVoice = audioData.slice(0, 7);
+          const midVoice = audioData.slice(8, 15);
+          const highVoice = audioData.slice(16, 31);
+
+          const averagedVoice = [...Array(barsCount / 2)].map(
+            (l, i) => (lowVoice[i] + midVoice[i] + highVoice[i]) / 3,
+          );
+
+          const regular =
+            (1 / 128) * averagedVoice[Math.abs(i - barsCount / 2)];
+
+          const shift = 1 - Math.abs(i - barsCount / 2) * 0.1;
+
+          return regular > 0 ? regular * shift : 0;
+        };
+
+        for (let i = 0; i < barsCount; i++) {
           this.#container.addChild(
             this.#drawBar(
               i,
-              Math.random() * this.self.BarMaxHeight -
+              getFreqLevel(i) * this.self.BarMaxHeight -
                 this.self.BarMinHeight +
                 this.self.BarMinHeight,
             ),
@@ -395,14 +555,8 @@ export default function (Pixi) {
           this.#container.width / 2,
           this.self.BarMaxHeight,
         );
-      }, 100);
+      }, 10);
     }
-
-    start() {
-      // TODO;
-    }
-
-    stop() {}
 
     destroy() {
       clearInterval(this.#interval);
@@ -411,6 +565,11 @@ export default function (Pixi) {
 
     getContainer() {
       return this.#container;
+    }
+
+    changeAudioDevice(app, newAudioMedia) {
+      this.destroy();
+      this.#initialize(newAudioMedia);
     }
 
     #drawBar(index = 0, height) {
@@ -477,25 +636,51 @@ export default function (Pixi) {
      */
     current;
 
+    audioStream;
+
+    /**
+     * DeviceId's for Audio and Video. They must be used if provided
+     */
+    useAudioId;
+    useVideoId;
+
     #dragTarget;
     #dragCoords;
 
     #resizeObserver;
+
+    #streamAudioChangeListener;
 
     isStreaming = false;
 
     constructor(options = {}) {
       super();
 
-      this.wrapper = document.querySelector(
-        options.wrapper || BaseStreamControl.Wrapper,
-      );
+      if (options.wrapper) {
+        if (typeof options.wrapper === "string") {
+          this.wrapper = document.querySelector(options.wrapper);
+        } else if (options.wrapper instanceof HTMLElement) {
+          this.wrapper = options.wrapper;
+        }
+      } else {
+        this.wrapper = document.querySelector(BaseStreamControl.Wrapper);
+      }
+
+      this.audioStream = navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
 
       if (options.controlsWrapper) {
         this.#controlsWrapperClassName = options.controlsWrapper;
       }
 
+      if (options.devices) {
+        this.useAudioId = options.devices.audio;
+        this.useVideoId = options.devices.video;
+      }
+
       this.#app = new PixiApplication({
+        view: options.view,
         background: options.background || BaseStreamControl.BackColor,
         width: options.width || 1280,
         height: options.height || 720,
@@ -529,11 +714,13 @@ export default function (Pixi) {
       this.#controlsConstructor?.();
     }
 
-    unmountApp(globalName) {
-      if (globalName) {
+    unmountApp(globalNameOrFunc) {
+      if (typeof globalNameOrFunc === "string") {
         this.isGlobalized = true;
-        this.globalName = globalName;
-        window[globalName] = this.#app.view;
+        this.globalName = globalNameOrFunc;
+        window[globalNameOrFunc] = this.#app.view;
+      } else if (typeof globalNameOrFunc === "function") {
+        globalNameOrFunc(this.#app.view);
       }
 
       this.#app.view.remove();
@@ -553,6 +740,8 @@ export default function (Pixi) {
     async gotoScreen() {
       if (this.isDestroyed) throw this.self.DestroyedStateError;
 
+      this.current?.destroy(this.#app);
+
       const screenMode = new ScreenDemonstration(this);
 
       let returnToFullscreen = false;
@@ -566,9 +755,20 @@ export default function (Pixi) {
           video: { displaySurface: "monitor" },
         }),
       );
-      screenMode.addCameraMedia(
-        await navigator.mediaDevices.getUserMedia({ video: true }),
-      );
+
+      let cameraMedia;
+
+      if (this.useVideoId) {
+        cameraMedia = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: this.useVideoId },
+        });
+      } else {
+        cameraMedia = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+      }
+
+      screenMode.addCameraMedia(cameraMedia);
 
       if (returnToFullscreen) {
         this.#app.view.parentElement.requestFullscreen();
@@ -576,7 +776,6 @@ export default function (Pixi) {
 
       screenMode.attachToApp(this.#app);
 
-      this.current?.destroy(this.#app);
       this.current = screenMode;
 
       return screenMode;
@@ -585,15 +784,26 @@ export default function (Pixi) {
     async gotoCamera(options) {
       if (this.isDestroyed) throw this.self.DestroyedStateError;
 
+      this.current?.destroy(this.#app);
+
+      let cameraMedia;
+
+      if (this.useVideoId) {
+        cameraMedia = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: this.useVideoId },
+        });
+      } else {
+        cameraMedia = await navigator.mediaDevices.getUserMedia({
+          video: true,
+        });
+      }
+
       const cameraMode = new CameraDemonstration(this, options);
 
-      cameraMode.addCameraMedia(
-        await navigator.mediaDevices.getUserMedia({ video: true }),
-      );
+      cameraMode.addCameraMedia(cameraMedia);
 
       cameraMode.attachToApp(this.#app);
 
-      this.current?.destroy(this.#app);
       this.current = cameraMode;
 
       return cameraMode;
@@ -709,7 +919,6 @@ export default function (Pixi) {
       const self = this;
 
       const toggleBoxMovement = (isCheck = false) => {
-        console.log(event);
         return self.#spriteBoxedMovement(
           self.#dragTarget,
           event.x,
@@ -792,10 +1001,9 @@ export default function (Pixi) {
     async applyAudioTrack(stream) {
       if (this.isDestroyed) throw this.self.DestroyedStateError;
 
-      const userMedia = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
-      const audioTrack = userMedia.getAudioTracks()[0];
+      const audioStream = await this.audioStream;
+
+      const audioTrack = audioStream.getAudioTracks()[0];
       audioTrack.enabled = false;
 
       stream.addTrack(audioTrack);
@@ -808,6 +1016,18 @@ export default function (Pixi) {
 
       const stream = this.#app.view.captureStream(30);
       this.applyAudioTrack(stream);
+
+      this.#streamAudioChangeListener = () => {
+        const audioTrack = stream.getAudioTracks()[0];
+        stream.removeTrack(audioTrack);
+
+        this.applyAudioTrack(stream);
+      };
+
+      this.parent.addEventListener(
+        "audio-device-change",
+        this.#streamAudioChangeListener,
+      );
 
       this.#streamer = new BrowserToRtmpClient(stream, {
         host: relayServer.host,
@@ -827,15 +1047,61 @@ export default function (Pixi) {
         return;
       }
 
+      this.parent.addEventListener(
+        "audio-device-change",
+        this.#streamAudioChangeListener,
+      );
+
       this.#streamer.stop();
     }
 
-    destroy() {
+    changeCameraDevice(deviceId) {
+      this.useVideoId = deviceId;
+      this.#emit("video-device-change", deviceId);
+    }
+
+    changeAudioDevice(deviceId) {
+      this.useAudioId = deviceId;
+
+      const newAudioMediaPromise = navigator.mediaDevices.getUserMedia({
+        audio: { deviceId },
+      });
+
+      newAudioMediaPromise.then((newAudioMedia) => {
+        this.audioStream = newAudioMedia;
+        this.#emit("audio-device-change", {
+          audioStream: newAudioMedia,
+          deviceId,
+        });
+      });
+    }
+
+    #emit(eventName, data) {
+      const event = new CustomEvent(eventName, { detail: data });
+      this.dispatchEvent(event);
+    }
+
+    async destroy() {
       if (this.isDestroyed) throw this.self.DestroyedStateError;
+
+      const audioStream = await this.audioStream;
+      const audioTrack = audioStream.getAudioTracks()[0];
+      audioTrack.stop();
+      audioStream.removeTrack(audioTrack);
+      this.audioStream = null;
+
+      if (this.isGlobalized) {
+        if (typeof this.globalName === "function") {
+          this.globalName(null);
+        } else if (typeof this.globalName === "string") {
+          window[this.globalName] = null;
+        }
+      }
 
       this.#resizeObserver.disconnect();
 
       this.stopStreaming();
+      this.current?.destroy(this.#app);
       this.#app.destroy(true, true);
       this.isDestroyed = true;
     }

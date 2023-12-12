@@ -69,11 +69,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
   <script src="../dist/bastyon-streams.min.js"></script>
   <script>
+    window.__canvas = document.createElement("canvas");
+
     const { BastyonStreams } = BastyonStreamsCreator(PIXI);
 
     const streams = new BastyonStreams({
       /*width: 640,
       height: 480,*/
+      view: window.__canvas,
       user: {
         image: "../static/avatar.jpg",
         nickname: "DummyNick",
@@ -89,7 +92,7 @@
     );
 
     document.querySelector("#pixi-pip").addEventListener("click", () => {
-      streams.unmountApp("_pixiapp");
+      streams.unmountApp();
       streams.mountApp(document.querySelector("#pixi-wrapper-pip"));
     });
   </script>
