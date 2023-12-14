@@ -29,6 +29,7 @@ export default function (Pixi) {
         const videoElement = document.createElement("video");
 
         videoElement.srcObject = source;
+        videoElement.muted = true;
         //videoElement.play();
 
         super(videoElement, {
@@ -679,6 +680,10 @@ export default function (Pixi) {
         this.useVideoId = options.devices.video;
       }
 
+      if (options.electron) {
+        this.electron = true;
+      }
+
       this.#app = new PixiApplication({
         view: options.view,
         background: options.background || BaseStreamControl.BackColor,
@@ -750,11 +755,25 @@ export default function (Pixi) {
         returnToFullscreen = true;
       }
 
-      screenMode.addScreenMedia(
-        await navigator.mediaDevices.getDisplayMedia({
-          video: { displaySurface: "monitor" },
-        }),
-      );
+      if (this.electron) {
+        screenMode.addScreenMedia(
+          await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: "desktop",
+              },
+            },
+          }),
+        );
+      } else {
+        screenMode.addScreenMedia(
+          await navigator.mediaDevices.getDisplayMedia({
+            audio: false,
+            video: { displaySurface: "monitor" },
+          }),
+        );
+      }
 
       let cameraMedia;
 
